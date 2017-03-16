@@ -26,6 +26,16 @@
     #hostname {
         width: 30%;
     }
+    .group-row .json-tooltip {
+        display: none;
+        position: absolute;
+        background: wheat;
+        z-index: 1;
+        border: 1px solid black;
+    }
+    .group-row:hover .json-tooltip {
+        display: block;
+    }
 </style>
 
 <body ng-app="SidecarApp">
@@ -86,8 +96,12 @@
           </tr>
 
           <tr ng-repeat="group in services" 
-              ng-class="{'success': group[0].Status == 0, 'warning': group[0].Status == 1, 'danger': group[0].Status == 2 }">
-            <td><span style="font-size: large" class="badge">{{ group.length }}</span></td>
+              ng-class="{'success': group[0].Status == 0, 'warning': group[0].Status == 1, 'danger': group[0].Status == 2 }"
+              class="group-row">
+            <td>
+              <span style="font-size: large" class="badge">{{ group.length }}</span>
+              <pre class="json-tooltip">{{ group[0] | prettyJSON }}</pre>
+            </td>
             <td>{{ group[0].Image | extractTag }}</td>
             <td>{{ group[0].Ports | portsStr }}</td>
             <td>{{ group[0].Created | timeAgo }}</td>
