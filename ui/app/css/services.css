@@ -1,0 +1,39 @@
+.panel-heading {
+   padding: 5px 15px;
+}
+h4 {
+   margin-top: 5px;
+   margin-bottom: 5px;
+}
+.table {
+   margin-bottom: 5px;
+}
+body {
+    width: 100%;
+}
+table {
+   table-layout: fixed;
+}
+tr {
+    width: 100%;
+}
+.hostname {
+    font-weight: bold;
+    font-size: large;
+}
+#hostname {
+    width: 30%;
+}
+.group-row {
+    background-color: #789;
+}
+.group-row .json-tooltip {
+    display: none;
+    position: absolute;
+    background-color: #f5deb3;
+    z-index: 1;
+    border: 1px solid black;
+}
+.group-row:hover .json-tooltip {
+    display: block;
+}
