@@ -1,0 +1,56 @@
+.panel-heading {
+    padding: 5px 15px;
+}
+h4 {
+    margin-top: 5px;
+    margin-bottom: 5px;
+}
+.table {
+    margin-bottom: 5px;
+}
+body {
+    width: 100%;
+}
+table {
+    table-layout: fixed;
+}
+tr {
+    width: 100%;
+}
+.hostname {
+    font-weight: bold;
+    font-size: large;
+}
+#hostname {
+    width: 30%;
+}
+.group-row {
+    background-color: #789;
+    font-size: 14px;
+}
+.group-row > td {
+    vertical-align: middle !important;
+}
+.group-row .service-json-tooltip {
+    display: none;
+    position: absolute;
+    background-color: #f5deb3;
+    z-index: 1;
+    border: 1px solid black;
+    top: 0px;
+}
+.service-info-icon {
+    font-size: 23px;
+    padding: 0 0 0 5px;
+}
+.service-info-icon:hover ~ .service-json-tooltip {
+    display: block;
+}
+.service-json-tooltip:hover {
+    display: block;
+}
+.service-badge {
+    float: left;
+    font-size: 18px;
+    border-radius: 20px
+}

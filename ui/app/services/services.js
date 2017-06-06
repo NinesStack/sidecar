@@ -240,6 +240,12 @@ angular.module('sidecar.services', ['ngRoute', 'ui.bootstrap'])
 	}
 })
 
+.filter('prettyJSON', function() {
+	return function(obj) {
+		return JSON ? JSON.stringify(obj, null, 2) : obj;
+	}
+})
+
 ;
 
 if ( ! Array.prototype.groupBy) {
