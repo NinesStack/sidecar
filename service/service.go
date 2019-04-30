@@ -58,7 +58,9 @@ func (svc *Service) IsTombstone() bool {
 }
 
 func (svc *Service) Invalidates(otherSvc *Service) bool {
-	return otherSvc != nil && svc.Updated.After(otherSvc.Updated)
+	return otherSvc != nil &&
+		svc.Updated.After(otherSvc.Updated) &&
+		!(otherSvc.Status == DRAINING && svc.Status == ALIVE)
 }
 
 func (svc *Service) Format() string {
