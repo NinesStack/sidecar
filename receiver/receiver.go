@@ -47,6 +47,8 @@ func ShouldNotify(oldStatus int, newStatus int) bool {
 	switch newStatus {
 	case service.ALIVE:
 		return true
+	case service.DRAINING:
+		return true
 	case service.TOMBSTONE:
 		return true
 	case service.UNKNOWN:

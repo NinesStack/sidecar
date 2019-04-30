@@ -11,15 +11,16 @@ import (
 	"time"
 
 	"github.com/Nitro/sidecar/service"
-	log "github.com/sirupsen/logrus"
 	"github.com/relistan/go-director"
+	log "github.com/sirupsen/logrus"
 )
 
 const (
-	HEALTHY = 0
-	SICKLY  = iota
-	FAILED  = iota
-	UNKNOWN = iota
+	HEALTHY  = 0
+	SICKLY   = iota
+	FAILED   = iota
+	UNKNOWN  = iota
+	DRAINING = iota
 )
 
 const (
@@ -118,6 +119,8 @@ func (check *Check) ServiceStatus() int {
 	case HEALTHY:
 		return service.ALIVE
 	case SICKLY:
+		return service.ALIVE
+	case DRAINING:
 		return service.ALIVE
 	case UNKNOWN:
 		return service.UNKNOWN
