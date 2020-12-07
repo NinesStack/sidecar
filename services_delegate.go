@@ -8,6 +8,7 @@ import (
 	"github.com/Nitro/memberlist"
 	"github.com/Nitro/sidecar/catalog"
 	"github.com/Nitro/sidecar/service"
+	metrics "github.com/armon/go-metrics"
 	"github.com/pquerna/ffjson/ffjson"
 	log "github.com/sirupsen/logrus"
 )
