@@ -2,12 +2,12 @@ package main
 
 import (
 	"encoding/json"
+	"math/rand"
 	"time"
 
 	"github.com/Nitro/memberlist"
 	"github.com/Nitro/sidecar/catalog"
 	"github.com/Nitro/sidecar/service"
-	"github.com/armon/go-metrics"
 	"github.com/pquerna/ffjson/ffjson"
 	log "github.com/sirupsen/logrus"
 )
