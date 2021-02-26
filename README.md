@@ -283,7 +283,7 @@ how to handle a service it has discovered. It uses these to:
  2. How to name the service. `ServiceName=`
  3. How to health check the service. `HealthCheck` and `HealthCheckArgs`
  4. Whether or not the service is a receiver of Sidecar change events. `SidecarListener`
- 5. Wether or not Sidecar should entirely ignore this service. `SidecarDiscovery`
+ 5. Whether or not Sidecar should entirely ignore this service. `SidecarDiscovery`
  6. Envoy or HAproxy proxy behavior. `ProxyMode`
 
 **Service Ports**
