@@ -207,6 +207,44 @@ func connectionManagerForService(svc *service.Service, envoyServiceName string) 
 				Cluster: envoyServiceName,
 			},
 		}
+	case "ws":
+		managerName = wellknown.HTTPConnectionManager
+
+		manager = &hcm.HttpConnectionManager{
+			StatPrefix: "ingress_http",
+			HttpFilters: []*hcm.HttpFilter{{
+				Name: wellknown.Router,
+			}},
+			RouteSpecifier: &hcm.HttpConnectionManager_RouteConfig{
+				RouteConfig: &api.RouteConfiguration{
+					ValidateClusters: &wrappers.BoolValue{Value: false},
+					VirtualHosts: []*route.VirtualHost{{
+						Name:    svc.Name,
+						Domains: []string{"*"},
+						Routes: []*route.Route{{
+							Match: &route.RouteMatch{
+								PathSpecifier: &route.RouteMatch_Prefix{
+									Prefix: "/",
+								},
+							},
+							Action: &route.Route_Route{
+								Route: &route.RouteAction{
+									ClusterSpecifier: &route.RouteAction_Cluster{
+										Cluster: envoyServiceName,
+									},
+									Timeout: &duration.Duration{},
+								},
+							},
+						}},
+					}},
+				},
+			},
+			UpgradeConfigs: []*hcm.HttpConnectionManager_UpgradeConfig{
+				{
+					UpgradeType: "websocket",
+				},
+			},
+		}
 	default:
 		return "", nil, fmt.Errorf("unrecognised proxy mode: %s", svc.ProxyMode)
 	}
