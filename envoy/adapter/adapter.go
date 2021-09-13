@@ -115,7 +115,7 @@ func EnvoyResourcesFromState(state *catalog.ServicesState, bindIP string,
 	// Used to make sure we don't map the same port to more than one service
 	portsMap := make(map[int64]string)
 
-	// We use the more expense EachServiceSorted to make sure we make a stable
+	// We use the more expensive EachServiceSorted to make sure we make a stable
 	// port mapping allocation in the event of port collisions.
 	state.EachServiceSorted(func(hostname *string, id *string, svc *service.Service) {
 		if svc == nil || !svc.IsAlive() {
