@@ -189,17 +189,17 @@ func EnvoyResourcesFromState(state *catalog.ServicesState, bindIP string,
 		}
 	})
 
-	endpoints := make([]cache_types.Resource, 0, len(endpointMap))
+	var endpoints []cache_types.Resource
 	for _, endpoint := range endpointMap {
 		endpoints = append(endpoints, endpoint)
 	}
 
-	clusters := make([]cache_types.Resource, 0, len(clusterMap))
+	var clusters []cache_types.Resource
 	for _, cluster := range clusterMap {
 		clusters = append(clusters, cluster)
 	}
 
-	listeners := make([]cache_types.Resource, 0, len(listenerMap))
+	var listeners []cache_types.Resource
 	for _, listener := range listenerMap {
 		listeners = append(listeners, listener)
 	}
