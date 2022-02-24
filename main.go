@@ -384,7 +384,7 @@ func main() {
 		)
 
 		// This listener will be owned and managed by the gRPC server
-		grpcListener, err := net.Listen("tcp", ":"+config.Envoy.GRPCPort)
+		grpcListener, err := net.Listen("tcp", "127.0.0.1:"+config.Envoy.GRPCPort)
 		if err != nil {
 			log.Fatalf("Failed to listen on port %q: %s", config.Envoy.GRPCPort, err)
 		}
