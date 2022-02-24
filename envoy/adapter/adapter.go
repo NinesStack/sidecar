@@ -17,6 +17,7 @@ import (
 	hcm "github.com/envoyproxy/go-control-plane/envoy/config/filter/network/http_connection_manager/v2"
 	tcpp "github.com/envoyproxy/go-control-plane/envoy/config/filter/network/tcp_proxy/v2"
 	cache_types "github.com/envoyproxy/go-control-plane/pkg/cache/types"
+	"github.com/envoyproxy/go-control-plane/pkg/resource/v3"
 	"github.com/envoyproxy/go-control-plane/pkg/wellknown"
 	"github.com/gogo/protobuf/proto"
 	"github.com/golang/protobuf/ptypes"
@@ -46,6 +47,18 @@ type EnvoyResources struct {
 	Endpoints []cache_types.Resource
 	Clusters  []cache_types.Resource
 	Listeners []cache_types.Resource
+}
+
+// AsMap returns the resources as a map, how it's now preferred in V3 API
+func (e *EnvoyResources) AsMap() map[string][]cache_types.Resource {
+	mapping := map[string][]cache_types.Resource{
+		resource.EndpointType: e.Endpoints,
+		resource.ClusterType:  e.Clusters,
+		resource.ListenerType: e.Listeners,
+	}
+
+	log.Debugf("%#v", mapping)
+	return mapping
 }
 
 // SvcName formats an Envoy service name from our service name and port
