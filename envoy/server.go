@@ -39,9 +39,11 @@ func (*xdsCallbacks) OnStreamResponse(ctx context.Context, _ int64, req *envoy_d
 func (*xdsCallbacks) OnFetchRequest(context.Context, *envoy_disco.DiscoveryRequest) error   { return nil }
 func (*xdsCallbacks) OnFetchResponse(*envoy_disco.DiscoveryRequest, *envoy_disco.DiscoveryResponse) {}
 func (*xdsCallbacks) OnDeltaStreamOpen(ctx context.Context, streamID int64, typeURL string) error {
+	log.Info("OnDeltaStreamOpen()");
 	return nil
 }
 func (*xdsCallbacks) OnStreamDeltaRequest(streamID int64, req *envoy_disco.DeltaDiscoveryRequest) error {
+	log.Info("OnDeltaStreamRequest()");
 	return nil
 }
 func (*xdsCallbacks) OnStreamDeltaResponse(streamID int64,
@@ -103,6 +105,7 @@ func (s *Server) Run(ctx context.Context, looper director.Looper, grpcListener n
 			return nil
 		}
 
+		log.Infof("New Snapshot: %#v", snap)
 		err = s.snapshotCache.SetSnapshot(ctx, hostname, snap)
 		if err != nil {
 			log.Errorf("Failed to set new Envoy cache snapshot: %s", err)

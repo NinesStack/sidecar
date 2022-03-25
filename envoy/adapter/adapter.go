@@ -57,7 +57,10 @@ func (e *EnvoyResources) AsMap() map[string][]cache_types.Resource {
 		resource.ListenerType: e.Listeners,
 	}
 
-	log.Debugf("%#v", mapping)
+	log.Infof("%#v", mapping)
+	log.Infof("Endpoints: %#v", e.Endpoints)
+	log.Infof("Clusters: %#v", e.Clusters)
+	log.Infof("Listeners: %#v", e.Listeners)
 	return mapping
 }
 
