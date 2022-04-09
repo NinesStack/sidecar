@@ -9,21 +9,21 @@ import (
 
 	"github.com/NinesStack/sidecar/catalog"
 	"github.com/NinesStack/sidecar/service"
-	api "github.com/envoyproxy/go-control-plane/envoy/api/v2"
-	core "github.com/envoyproxy/go-control-plane/envoy/api/v2/core"
-	endpoint "github.com/envoyproxy/go-control-plane/envoy/api/v2/endpoint"
-	listener "github.com/envoyproxy/go-control-plane/envoy/api/v2/listener"
-	route "github.com/envoyproxy/go-control-plane/envoy/api/v2/route"
-	hcm "github.com/envoyproxy/go-control-plane/envoy/config/filter/network/http_connection_manager/v2"
-	tcpp "github.com/envoyproxy/go-control-plane/envoy/config/filter/network/tcp_proxy/v2"
+	cluster "github.com/envoyproxy/go-control-plane/envoy/config/cluster/v3"
+	core "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
+	endpoint "github.com/envoyproxy/go-control-plane/envoy/config/endpoint/v3"
+	listener "github.com/envoyproxy/go-control-plane/envoy/config/listener/v3"
+	route "github.com/envoyproxy/go-control-plane/envoy/config/route/v3"
+	hcm "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/network/http_connection_manager/v3"
+	tcpp "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/network/tcp_proxy/v3"
 	cache_types "github.com/envoyproxy/go-control-plane/pkg/cache/types"
 	"github.com/envoyproxy/go-control-plane/pkg/resource/v3"
 	"github.com/envoyproxy/go-control-plane/pkg/wellknown"
-	"github.com/gogo/protobuf/proto"
-	"github.com/golang/protobuf/ptypes"
 	"github.com/golang/protobuf/ptypes/duration"
 	"github.com/golang/protobuf/ptypes/wrappers"
 	log "github.com/sirupsen/logrus"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/reflect/protoreflect"
 	anypb "google.golang.org/protobuf/types/known/anypb"
 )
 
@@ -101,13 +101,9 @@ func isPortCollision(portsMap map[int64]string, svc *service.Service, port servi
 	registeredName, ok := portsMap[port.ServicePort]
 	// See if we already know about this port
 	if ok {
-		// If it is the same service, then no collision
-		if registeredName == svc.Name {
-			return false
-		}
-
-		// Uh, oh, this is not the service assigned to this port
-		return true
+		// If it is the same service, then no collision and we return false.
+		// Otherwise, this is not the service assigned to this port.
+		return registeredName != svc.Name
 	}
 
 	// We don't know about it, so assign it.
@@ -121,8 +117,8 @@ func isPortCollision(portsMap map[int64]string, svc *service.Service, port servi
 func EnvoyResourcesFromState(state *catalog.ServicesState, bindIP string,
 	useHostnames bool) EnvoyResources {
 
-	endpointMap := make(map[string]*api.ClusterLoadAssignment)
-	clusterMap := make(map[string]*api.Cluster)
+	endpointMap := make(map[string]*endpoint.ClusterLoadAssignment)
+	clusterMap := make(map[string]*cluster.Cluster)
 	listenerMap := make(map[string]cache_types.Resource)
 
 	// Used to make sure we don't map the same port to more than one service
@@ -162,22 +158,23 @@ func EnvoyResourcesFromState(state *catalog.ServicesState, bindIP string,
 					append(assignment.Endpoints[0].LbEndpoints,
 						envoyServiceFromService(svc, port.ServicePort, useHostnames)...)
 			} else {
-				endpointMap[envoyServiceName] = &api.ClusterLoadAssignment{
+				endpointMap[envoyServiceName] = &endpoint.ClusterLoadAssignment{
 					ClusterName: envoyServiceName,
 					Endpoints: []*endpoint.LocalityLbEndpoints{{
 						LbEndpoints: envoyServiceFromService(svc, port.ServicePort, useHostnames),
 					}},
 				}
 
-				clusterMap[envoyServiceName] = &api.Cluster{
+				clusterMap[envoyServiceName] = &cluster.Cluster{
 					Name:                 envoyServiceName,
 					ConnectTimeout:       &duration.Duration{Nanos: 500000000}, // 500ms
-					ClusterDiscoveryType: &api.Cluster_Type{Type: api.Cluster_EDS},
-					EdsClusterConfig: &api.Cluster_EdsClusterConfig{
+					ClusterDiscoveryType: &cluster.Cluster_Type{Type: cluster.Cluster_EDS},
+					EdsClusterConfig: &cluster.Cluster_EdsClusterConfig{
 						EdsConfig: &core.ConfigSource{
 							ConfigSourceSpecifier: &core.ConfigSource_Ads{
 								Ads: &core.AggregatedConfigSource{},
 							},
+							ResourceApiVersion: core.ApiVersion_V3,
 						},
 					},
 					// Contour believes the IdleTimeout should be set to 60s. Not sure if we also need to enable these.
@@ -226,8 +223,10 @@ func EnvoyResourcesFromState(state *catalog.ServicesState, bindIP string,
 
 // connectionManagerForService returns a ConnectionManager configured
 // appropriately for the Sidecar service
-func connectionManagerForService(svc *service.Service, envoyServiceName string) (managerName string, manager proto.Message, err error) {
+func connectionManagerForService(svc *service.Service, envoyServiceName string) (managerName string, manager protoreflect.ProtoMessage, err error) {
 	switch svc.ProxyMode {
+	case "ws":
+		fallthrough
 	case "http":
 		managerName = wellknown.HTTPConnectionManager
 
@@ -237,7 +236,7 @@ func connectionManagerForService(svc *service.Service, envoyServiceName string) 
 				Name: wellknown.Router,
 			}},
 			RouteSpecifier: &hcm.HttpConnectionManager_RouteConfig{
-				RouteConfig: &api.RouteConfiguration{
+				RouteConfig: &route.RouteConfiguration{
 					ValidateClusters: &wrappers.BoolValue{Value: false},
 					VirtualHosts: []*route.VirtualHost{{
 						Name:    svc.Name,
@@ -260,6 +259,13 @@ func connectionManagerForService(svc *service.Service, envoyServiceName string) 
 					}},
 				},
 			},
+		}
+		if svc.ProxyMode == "ws" {
+			manager.(*hcm.HttpConnectionManager).UpgradeConfigs = []*hcm.HttpConnectionManager_UpgradeConfig{
+				{
+					UpgradeType: "websocket",
+				},
+			}
 		}
 	case "tcp":
 		managerName = wellknown.TCPProxy
@@ -268,44 +274,6 @@ func connectionManagerForService(svc *service.Service, envoyServiceName string) 
 			StatPrefix: "ingress_tcp",
 			ClusterSpecifier: &tcpp.TcpProxy_Cluster{
 				Cluster: envoyServiceName,
-			},
-		}
-	case "ws":
-		managerName = wellknown.HTTPConnectionManager
-
-		manager = &hcm.HttpConnectionManager{
-			StatPrefix: "ingress_http",
-			HttpFilters: []*hcm.HttpFilter{{
-				Name: wellknown.Router,
-			}},
-			RouteSpecifier: &hcm.HttpConnectionManager_RouteConfig{
-				RouteConfig: &api.RouteConfiguration{
-					ValidateClusters: &wrappers.BoolValue{Value: false},
-					VirtualHosts: []*route.VirtualHost{{
-						Name:    svc.Name,
-						Domains: []string{"*"},
-						Routes: []*route.Route{{
-							Match: &route.RouteMatch{
-								PathSpecifier: &route.RouteMatch_Prefix{
-									Prefix: "/",
-								},
-							},
-							Action: &route.Route_Route{
-								Route: &route.RouteAction{
-									ClusterSpecifier: &route.RouteAction_Cluster{
-										Cluster: envoyServiceName,
-									},
-									Timeout: &duration.Duration{},
-								},
-							},
-						}},
-					}},
-				},
-			},
-			UpgradeConfigs: []*hcm.HttpConnectionManager_UpgradeConfig{
-				{
-					UpgradeType: "websocket",
-				},
 			},
 		}
 	default:
@@ -338,14 +306,16 @@ func envoyListenerFromService(svc *service.Service, envoyServiceName string,
 		return nil, fmt.Errorf("failed to create the connection manager: %w", err)
 	}
 
-	serializedManager, err := ptypes.MarshalAny(manager)
+	var serializedManager anypb.Any
+	anypb.MarshalFrom(&serializedManager, manager, proto.MarshalOptions{})
+	// serializedManager, err := ptypes.MarshalAny(manager)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create the connection manager: %w", err)
 	}
 
-	filterChains := filterChainsForService(svc, managerName, serializedManager)
+	filterChains := filterChainsForService(svc, managerName, &serializedManager)
 
-	return &api.Listener{
+	return &listener.Listener{
 		Name: envoyServiceName,
 		Address: &core.Address{
 			Address: &core.Address_SocketAddress{

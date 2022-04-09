@@ -25,8 +25,8 @@ const (
 
 type xdsCallbacks struct{}
 
-func (*xdsCallbacks) OnStreamOpen(context.Context, int64, string) error  { return nil }
-func (*xdsCallbacks) OnStreamClosed(int64)                               {}
+func (*xdsCallbacks) OnStreamOpen(context.Context, int64, string) error          { return nil }
+func (*xdsCallbacks) OnStreamClosed(int64)                                       {}
 func (*xdsCallbacks) OnStreamRequest(int64, *envoy_disco.DiscoveryRequest) error { return nil }
 func (*xdsCallbacks) OnStreamResponse(ctx context.Context, _ int64, req *envoy_disco.DiscoveryRequest, _ *envoy_disco.DiscoveryResponse) {
 	if req.GetErrorDetail().GetCode() != 0 {
@@ -36,7 +36,7 @@ func (*xdsCallbacks) OnStreamResponse(ctx context.Context, _ int64, req *envoy_d
 		)
 	}
 }
-func (*xdsCallbacks) OnFetchRequest(context.Context, *envoy_disco.DiscoveryRequest) error   { return nil }
+func (*xdsCallbacks) OnFetchRequest(context.Context, *envoy_disco.DiscoveryRequest) error           { return nil }
 func (*xdsCallbacks) OnFetchResponse(*envoy_disco.DiscoveryRequest, *envoy_disco.DiscoveryResponse) {}
 func (*xdsCallbacks) OnDeltaStreamOpen(ctx context.Context, streamID int64, typeURL string) error {
 	return nil
@@ -45,7 +45,8 @@ func (*xdsCallbacks) OnStreamDeltaRequest(streamID int64, req *envoy_disco.Delta
 	return nil
 }
 func (*xdsCallbacks) OnStreamDeltaResponse(streamID int64,
-	req *envoy_disco.DeltaDiscoveryRequest, resp *envoy_disco.DeltaDiscoveryResponse) {}
+	req *envoy_disco.DeltaDiscoveryRequest, resp *envoy_disco.DeltaDiscoveryResponse) {
+}
 func (*xdsCallbacks) OnDeltaStreamClosed(streamID int64) {}
 
 // Server is a wrapper around Envoy's control plane xDS gRPC server and it uses
@@ -132,9 +133,13 @@ func (s *Server) Run(ctx context.Context, looper director.Looper, grpcListener n
 
 // NewServer creates a new Server instance
 func NewServer(ctx context.Context, state *catalog.ServicesState, config config.EnvoyConfig) *Server {
-	// Instruct the snapshot cache to use Aggregated Discovery Service (ADS)
 	logger := log.New()
-	logger.SetLevel(log.DebugLevel)
+	if lvl, err := log.ParseLevel(config.LoggingLevel); err == nil {
+		logger.SetLevel(lvl)
+	} else {
+		log.Warnf("Invalid Envoy logging level (%s): %s", config.LoggingLevel, err)
+	}
+
 	snapshotCache := cache.NewSnapshotCache(true, cache.IDHash{}, logger)
 
 	return &Server{

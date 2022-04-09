@@ -224,7 +224,8 @@ Defaults are in bold at the end of the line:
  * `ENVOY_USE_HOSTNAMES`: Should we write hostnames in the Envoy config instead
    of IP addresses? **`false`**
  * `ENVOY_GRPC_PORT`: The port for the Envoy API gRPC server **`7776`**
-
+ * `ENVOY_LOGGING_LEVEL`: The logging level to use (debug, info, warn, error)
+   **info**
 
 ### Ports
 

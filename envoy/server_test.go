@@ -14,20 +14,22 @@ import (
 	"github.com/NinesStack/sidecar/config"
 	"github.com/NinesStack/sidecar/envoy/adapter"
 	"github.com/NinesStack/sidecar/service"
+	"github.com/golang/protobuf/ptypes/any"
 
-	api "github.com/envoyproxy/go-control-plane/envoy/api/v2"
-	core "github.com/envoyproxy/go-control-plane/envoy/api/v2/core"
+	cluster "github.com/envoyproxy/go-control-plane/envoy/config/cluster/v3"
+	core "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
+	endpoint "github.com/envoyproxy/go-control-plane/envoy/config/endpoint/v3"
 	hcm "github.com/envoyproxy/go-control-plane/envoy/config/filter/network/http_connection_manager/v2"
 	tcpp "github.com/envoyproxy/go-control-plane/envoy/config/filter/network/tcp_proxy/v2"
-	envoy_discovery "github.com/envoyproxy/go-control-plane/envoy/service/discovery/v2"
+	listener "github.com/envoyproxy/go-control-plane/envoy/config/listener/v3"
+	envoy_disco "github.com/envoyproxy/go-control-plane/envoy/service/discovery/v3"
 	"github.com/envoyproxy/go-control-plane/pkg/cache/v3"
 	"github.com/envoyproxy/go-control-plane/pkg/resource/v3"
 	xds "github.com/envoyproxy/go-control-plane/pkg/server/v3"
 	"github.com/envoyproxy/go-control-plane/pkg/wellknown"
-
-	"github.com/golang/protobuf/ptypes"
-	"github.com/golang/protobuf/ptypes/any"
 	"google.golang.org/grpc"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/relistan/go-director"
 	log "github.com/sirupsen/logrus"
@@ -48,8 +50,8 @@ var (
 )
 
 func validateListener(serialisedListener *any.Any, svc service.Service) {
-	listener := &api.Listener{}
-	err := ptypes.UnmarshalAny(serialisedListener, listener)
+	listener := &listener.Listener{}
+	err := anypb.UnmarshalTo(serialisedListener, listener, proto.UnmarshalOptions{})
 	So(err, ShouldBeNil)
 	So(listener.Name, ShouldEqual, adapter.SvcName(svc.Name, svc.Ports[0].ServicePort))
 	So(listener.GetAddress().GetSocketAddress().GetAddress(), ShouldEqual, bindIP)
@@ -63,7 +65,7 @@ func validateListener(serialisedListener *any.Any, svc service.Service) {
 	case "http":
 		So(filters[0].GetName(), ShouldEqual, wellknown.HTTPConnectionManager)
 		connectionManager := &hcm.HttpConnectionManager{}
-		err = ptypes.UnmarshalAny(filters[0].GetTypedConfig(), connectionManager)
+		err = anypb.UnmarshalTo(filters[0].GetTypedConfig(), connectionManager, proto.UnmarshalOptions{})
 		So(err, ShouldBeNil)
 		So(connectionManager.GetStatPrefix(), ShouldEqual, "ingress_http")
 		So(connectionManager.GetRouteConfig(), ShouldNotBeNil)
@@ -78,14 +80,14 @@ func validateListener(serialisedListener *any.Any, svc service.Service) {
 	case "tcp":
 		So(filters[0].GetName(), ShouldEqual, wellknown.TCPProxy)
 		connectionManager := &tcpp.TcpProxy{}
-		err = ptypes.UnmarshalAny(filters[0].GetTypedConfig(), connectionManager)
+		err = anypb.UnmarshalTo(filters[0].GetTypedConfig(), connectionManager, proto.UnmarshalOptions{})
 		So(err, ShouldBeNil)
 		So(connectionManager.GetStatPrefix(), ShouldEqual, "ingress_tcp")
 		So(connectionManager.GetCluster(), ShouldEqual, adapter.SvcName(svc.Name, svc.Ports[0].ServicePort))
 	case "ws":
 		So(filters[0].GetName(), ShouldEqual, wellknown.HTTPConnectionManager)
 		connectionManager := &hcm.HttpConnectionManager{}
-		err = ptypes.UnmarshalAny(filters[0].GetTypedConfig(), connectionManager)
+		err = anypb.UnmarshalTo(filters[0].GetTypedConfig(), connectionManager, proto.UnmarshalOptions{})
 		So(err, ShouldBeNil)
 		So(connectionManager.GetStatPrefix(), ShouldEqual, "ingress_http")
 		So(connectionManager.GetRouteConfig(), ShouldNotBeNil)
@@ -106,8 +108,8 @@ func validateListener(serialisedListener *any.Any, svc service.Service) {
 }
 
 func validateEndpoints(serialisedAssignment *any.Any, svc service.Service) {
-	assignment := &api.ClusterLoadAssignment{}
-	err := ptypes.UnmarshalAny(serialisedAssignment, assignment)
+	assignment := &endpoint.ClusterLoadAssignment{}
+	err := anypb.UnmarshalTo(serialisedAssignment, assignment, proto.UnmarshalOptions{})
 	So(err, ShouldBeNil)
 	So(assignment.GetClusterName(), ShouldEqual, adapter.SvcName(svc.Name, svc.Ports[0].ServicePort))
 
@@ -121,16 +123,16 @@ func validateEndpoints(serialisedAssignment *any.Any, svc service.Service) {
 }
 
 func validateCluster(serialisedCluster *any.Any, svc service.Service) {
-	cluster := &api.Cluster{}
-	err := ptypes.UnmarshalAny(serialisedCluster, cluster)
+	c := &cluster.Cluster{}
+	err := anypb.UnmarshalTo(serialisedCluster, c, proto.UnmarshalOptions{})
 	So(err, ShouldBeNil)
-	So(cluster.Name, ShouldEqual, adapter.SvcName(svc.Name, svc.Ports[0].ServicePort))
-	So(cluster.GetConnectTimeout().GetNanos(), ShouldEqual, 500000000)
-	So(cluster.GetType(), ShouldEqual, api.Cluster_EDS)
-	So(cluster.GetEdsClusterConfig(), ShouldNotBeNil)
-	So(cluster.GetEdsClusterConfig().GetEdsConfig(), ShouldNotBeNil)
-	So(cluster.GetEdsClusterConfig().GetEdsConfig().GetAds(), ShouldNotBeNil)
-	So(cluster.GetLoadAssignment(), ShouldBeNil)
+	So(c.Name, ShouldEqual, adapter.SvcName(svc.Name, svc.Ports[0].ServicePort))
+	So(c.GetConnectTimeout().GetNanos(), ShouldEqual, 500000000)
+	So(c.GetType(), ShouldEqual, cluster.Cluster_EDS)
+	So(c.GetEdsClusterConfig(), ShouldNotBeNil)
+	So(c.GetEdsClusterConfig().GetEdsConfig(), ShouldNotBeNil)
+	So(c.GetEdsClusterConfig().GetEdsConfig().GetAds(), ShouldNotBeNil)
+	So(c.GetLoadAssignment(), ShouldBeNil)
 }
 
 // EnvoyMock is used to validate the Envoy state by making the same gRPC stream calls
@@ -145,14 +147,14 @@ func NewEnvoyMock() EnvoyMock {
 	}
 }
 
-func (sv *EnvoyMock) GetResource(stream envoy_discovery.AggregatedDiscoveryService_StreamAggregatedResourcesClient, resource string, hostname string) []*any.Any {
+func (sv *EnvoyMock) GetResource(stream envoy_disco.AggregatedDiscoveryService_StreamAggregatedResourcesClient, resource string, hostname string) []*any.Any {
 	nonce, ok := sv.nonces[resource]
 	if !ok {
 		// Set the initial nonce to 0 for each resource type. The control plane will increment
 		// it after each call, so we need to pass back the value we last received.
 		nonce = "0"
 	}
-	err := stream.Send(&api.DiscoveryRequest{
+	err := stream.Send(&envoy_disco.DiscoveryRequest{
 		VersionInfo: "1",
 		Node: &core.Node{
 			Id: hostname,
@@ -175,7 +177,7 @@ func (sv *EnvoyMock) GetResource(stream envoy_discovery.AggregatedDiscoveryServi
 	return response.Resources
 }
 
-func (sv *EnvoyMock) ValidateResources(stream envoy_discovery.AggregatedDiscoveryService_StreamAggregatedResourcesClient, svc service.Service, hostname string) {
+func (sv *EnvoyMock) ValidateResources(stream envoy_disco.AggregatedDiscoveryService_StreamAggregatedResourcesClient, svc service.Service, hostname string) {
 	for resourceType, validator := range validators {
 		resources := sv.GetResource(stream, resourceType, hostname)
 		So(resources, ShouldHaveLength, 1)
@@ -190,8 +192,8 @@ type SnapshotCache struct {
 	Waiter chan struct{}
 }
 
-func (c *SnapshotCache) SetSnapshot(node string, snapshot cache.Snapshot) error {
-	err := c.SnapshotCache.SetSnapshot(node, snapshot)
+func (c *SnapshotCache) SetSnapshot(ctx context.Context, node string, snapshot cache.Snapshot) error {
+	err := c.SnapshotCache.SetSnapshot(ctx, node, snapshot)
 
 	c.Waiter <- struct{}{}
 
@@ -308,7 +310,7 @@ func Test_PortForServicePort(t *testing.T) {
 				cancel()
 			})
 
-			stream, err := envoy_discovery.NewAggregatedDiscoveryServiceClient(conn).StreamAggregatedResources(ctx)
+			stream, err := envoy_disco.NewAggregatedDiscoveryServiceClient(conn).StreamAggregatedResources(ctx)
 			So(err, ShouldBeNil)
 
 			envoyMock := NewEnvoyMock()
@@ -339,8 +341,8 @@ func Test_PortForServicePort(t *testing.T) {
 
 					resources := envoyMock.GetResource(stream, resource.EndpointType, state.Hostname)
 					So(resources, ShouldHaveLength, 1)
-					assignment := &api.ClusterLoadAssignment{}
-					err := ptypes.UnmarshalAny(resources[0], assignment)
+					assignment := &endpoint.ClusterLoadAssignment{}
+					err := anypb.UnmarshalTo(resources[0], assignment, proto.UnmarshalOptions{})
 					So(err, ShouldBeNil)
 					So(assignment.GetEndpoints(), ShouldHaveLength, 1)
 					var ports sort.IntSlice

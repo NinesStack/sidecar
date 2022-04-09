@@ -30,6 +30,7 @@ type EnvoyConfig struct {
 	BindIP       string `envconfig:"BIND_IP" default:"192.168.168.168"`
 	UseHostnames bool   `envconfig:"USE_HOSTNAMES"`
 	GRPCPort     string `envconfig:"GRPC_PORT" default:"7776"`
+	LoggingLevel string `envconfig:"LOGGING_LEVEL" default:"info"`
 }
 
 type ServicesConfig struct {
