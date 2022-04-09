@@ -299,8 +299,9 @@ func main() {
 	exitWithError(err, "Failed to create memberlist")
 
 	// Join an existing cluster by specifying at least one known member.
-	_, err = list.Join(config.Sidecar.Seeds)
+	nodeCount, err := list.Join(config.Sidecar.Seeds)
 	exitWithError(err, "Failed to join cluster")
+	log.Info("Joined cluster with %d nodes contacted", nodeCount)
 
 	// Set up a bunch of go-director Loopers to run our
 	// background goroutines
