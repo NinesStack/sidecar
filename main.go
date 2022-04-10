@@ -361,7 +361,12 @@ func main() {
 		go proxy.Watch(state)
 	}
 
-	go announceMembers(list, state)
+	// This is kind of expensive because it looks at the state and formats text
+	// output on an ongoing basis. Only run in debug mode.
+	if config.Debug {
+		go announceMembers(list, state)
+	}
+
 	go state.BroadcastServices(serviceFunc, servicesLooper)
 	go state.BroadcastTombstones(serviceFunc, tombstoneLooper)
 	go state.TrackNewServices(serviceFunc, trackingLooper)
