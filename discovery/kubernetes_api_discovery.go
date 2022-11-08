@@ -2,6 +2,7 @@ package discovery
 
 import (
 	"encoding/json"
+	"sync"
 	"time"
 
 	"github.com/NinesStack/sidecar/service"
@@ -21,6 +22,7 @@ type K8sAPIDiscoverer struct {
 	Command K8sDiscoveryCommand
 
 	discovered *K8sServices
+	lock       sync.RWMutex
 }
 
 // NewK8sAPIDiscoverer returns a properly configured K8sAPIDiscoverer
@@ -44,6 +46,9 @@ func NewK8sAPIDiscoverer(clusterIP, clusterHostname, namespace,
 // cached data from the Command (`kubectl`) and returns services in a format
 // that Sidecar can manage.
 func (k *K8sAPIDiscoverer) Services() []service.Service {
+	k.lock.RLock()
+	defer k.lock.RUnlock()
+
 	var services []service.Service
 	for _, item := range k.discovered.Items {
 		svc := service.Service{
@@ -92,7 +97,9 @@ func (k *K8sAPIDiscoverer) Run(looper director.Looper) {
 			log.Errorf("Failed to invoke K8s API discovery: %s", err)
 		}
 
+		k.lock.Lock()
 		err = json.Unmarshal(data, &k.discovered)
+		k.lock.Unlock()
 		if err != nil {
 			log.Errorf("Failed to unmarshal json: %s, %s", err, string(data))
 		}
