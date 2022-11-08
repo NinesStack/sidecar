@@ -64,7 +64,7 @@ func (k *K8sAPIDiscoverer) Services() []service.Service {
 		for _, port := range item.Spec.Ports {
 			svc.Ports = append(svc.Ports, service.Port{
 				Type:        "tcp",
-				Port:        int64(port.Port),
+				Port:        int64(port.NodePort),
 				ServicePort: int64(port.Port),
 				IP:          k.ClusterIP,
 			})

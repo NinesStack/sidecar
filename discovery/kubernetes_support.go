@@ -34,6 +34,7 @@ type K8sServices struct {
 				Port       int    `json:"port"`
 				Protocol   string `json:"protocol"`
 				TargetPort int    `json:"targetPort"`
+				NodePort   int    `json:"nodePort"`
 			} `json:"ports"`
 			Selector struct {
 				Environment string `json:"Environment"`
@@ -70,5 +71,5 @@ type KubectlDiscoveryCommand struct {
 func (d *KubectlDiscoveryCommand) Run() ([]byte, error) {
 	// Run `kubectl` from the specific path, and namespace, and return data as
 	// JSON, to be parsed by the Discoverer
-	return exec.Command(d.Path, "-n", d.Namespace, "get", "services", "-o", "json", "--timeout", d.Timeout.String()).CombinedOutput()
+	return exec.Command(d.Path, "-n", d.Namespace, "get", "services", "-o", "json", "--request-timeout", d.Timeout.String()).CombinedOutput()
 }
