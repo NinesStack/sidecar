@@ -63,7 +63,7 @@ func (m *mockK8sDiscoveryCommand) Run() ([]byte, error) {
 func Test_NewK8sAPIDiscoverer(t *testing.T) {
 	Convey("NewK8sAPIDiscoverer()", t, func() {
 		Convey("returns a properly configured K8sAPIDiscoverer", func() {
-			disco := NewK8sAPIDiscoverer("127.0.0.1", "beowulf.example.com", "heorot", "/usr/local/somewhere")
+			disco := NewK8sAPIDiscoverer("127.0.0.1", "beowulf.example.com", "heorot", "/usr/local/somewhere", 3*time.Second)
 
 			So(disco.discovered, ShouldNotBeNil)
 			So(disco.ClusterIP, ShouldEqual, "127.0.0.1")
@@ -71,6 +71,7 @@ func Test_NewK8sAPIDiscoverer(t *testing.T) {
 			So(disco.Namespace, ShouldEqual, "heorot")
 			So(disco.Command, ShouldResemble, &KubectlDiscoveryCommand{
 				Path: "/usr/local/somewhere", Namespace: "heorot",
+				Timeout: 3*time.Second,
 			})
 		})
 	})
@@ -78,7 +79,7 @@ func Test_NewK8sAPIDiscoverer(t *testing.T) {
 
 func Test_K8sHealthCheck(t *testing.T) {
 	Convey("HealthCheck() always returns 'AlwaysSuccessful'", t, func() {
-		disco := NewK8sAPIDiscoverer("127.0.0.1", "beowulf.example.com", "heorot", "/usr/local/somewhere")
+		disco := NewK8sAPIDiscoverer("127.0.0.1", "beowulf.example.com", "heorot", "/usr/local/somewhere", 3*time.Second)
 		check, args := disco.HealthCheck(nil)
 		So(check, ShouldEqual, "AlwaysSuccessful")
 		So(args, ShouldBeEmpty)
@@ -87,7 +88,7 @@ func Test_K8sHealthCheck(t *testing.T) {
 
 func Test_K8sListeners(t *testing.T) {
 	Convey("Listeners() always returns and empty slice", t, func() {
-		disco := NewK8sAPIDiscoverer("127.0.0.1", "beowulf.example.com", "heorot", "/usr/local/somewhere")
+		disco := NewK8sAPIDiscoverer("127.0.0.1", "beowulf.example.com", "heorot", "/usr/local/somewhere", 3*time.Second)
 		listeners := disco.Listeners()
 		So(listeners, ShouldBeEmpty)
 	})
@@ -95,7 +96,7 @@ func Test_K8sListeners(t *testing.T) {
 
 func Test_K8sRun(t *testing.T) {
 	Convey("Run()", t, func() {
-		disco := NewK8sAPIDiscoverer("127.0.0.1", "beowulf.example.com", "heorot", "/usr/local/somewhere")
+		disco := NewK8sAPIDiscoverer("127.0.0.1", "beowulf.example.com", "heorot", "/usr/local/somewhere", 3*time.Second)
 		mock := &mockK8sDiscoveryCommand{}
 		disco.Command = mock
 
@@ -138,7 +139,7 @@ func Test_K8sRun(t *testing.T) {
 
 func Test_K8sServices(t *testing.T) {
 	Convey("Services()", t, func() {
-		disco := NewK8sAPIDiscoverer("127.0.0.1", "beowulf.example.com", "heorot", "/usr/local/somewhere")
+		disco := NewK8sAPIDiscoverer("127.0.0.1", "beowulf.example.com", "heorot", "/usr/local/somewhere", 3*time.Second)
 		mock := &mockK8sDiscoveryCommand{}
 		disco.Command = mock
 

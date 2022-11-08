@@ -24,7 +24,9 @@ type K8sAPIDiscoverer struct {
 }
 
 // NewK8sAPIDiscoverer returns a properly configured K8sAPIDiscoverer
-func NewK8sAPIDiscoverer(clusterIP, clusterHostname, namespace, path string) *K8sAPIDiscoverer {
+func NewK8sAPIDiscoverer(clusterIP, clusterHostname, namespace,
+	path string, timeout time.Duration) *K8sAPIDiscoverer {
+
 	return &K8sAPIDiscoverer{
 		discovered:      &K8sServices{},
 		ClusterIP:       clusterIP,
@@ -33,6 +35,7 @@ func NewK8sAPIDiscoverer(clusterIP, clusterHostname, namespace, path string) *K8
 		Command: &KubectlDiscoveryCommand{
 			Path:      path,
 			Namespace: namespace,
+			Timeout:   timeout,
 		},
 	}
 }
@@ -46,7 +49,7 @@ func (k *K8sAPIDiscoverer) Services() []service.Service {
 		svc := service.Service{
 			ID:        item.Metadata.UID,
 			Name:      item.Metadata.Labels.ServiceName,
-			Image:     item.Metadata.Labels.ServiceName+":kubernetes-hosted",
+			Image:     item.Metadata.Labels.ServiceName + ":kubernetes-hosted",
 			Created:   item.Metadata.CreationTimestamp,
 			Hostname:  k.ClusterHostname,
 			ProxyMode: "http",
