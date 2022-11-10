@@ -66,11 +66,11 @@ type StaticConfig struct {
 }
 
 type K8sAPIConfig struct {
-	ClusterIP       string        `envconfig:"CLUSTER_IP" default:"127.0.0.1"`
-	ClusterHostname string        `envconfig:"CLUSTER_HOSTNAME" default:"localhost"`
-	Namespace       string        `envconfig:"NAMESPACE" default:"default"`
-	KubectlPath     string        `envconfig:"KUBECTL_PATH" default:"/usr/local/bin/kubectl"`
-	KubectlTimeout  time.Duration `envconfig:"KUBECTL_TIMEOUT" default:"3s"`
+	KubeAPIIP      string        `envconfig:"KUBE_API_IP" default:"127.0.0.1"`
+	KubeAPIPort    int           `envconfig:"KUBE_API_PORT" default:"localhost"`
+	Namespace      string        `envconfig:"NAMESPACE" default:"default"`
+	KubectlPath    string        `envconfig:"KUBECTL_PATH" default:"/usr/local/bin/kubectl"`
+	KubectlTimeout time.Duration `envconfig:"KUBECTL_TIMEOUT" default:"3s"`
 }
 
 type Config struct {

@@ -1,5 +1,7 @@
 FROM library/alpine:3.6
 
+ENV KUBECTL_PATH=/kubectl
+
 # Necessary depedencies
 RUN apk --update add haproxy bash curl tar
 
@@ -11,6 +13,10 @@ ADD sidecar /sidecar/sidecar
 ADD views /sidecar/views
 ADD docker/s6 /etc
 ADD ui /sidecar/ui
+
+# Add Kubectl
+ADD https://dl.k8s.io/release/v1.25.3/bin/linux/amd64/kubectl /kubectl
+RUN chmod 755 /kubectl
 
 EXPOSE 7777
 

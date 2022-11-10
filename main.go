@@ -140,7 +140,7 @@ func configureDiscovery(config *config.Config, publishedIP string) discovery.Dis
 			disco.Discoverers = append(
 				disco.Discoverers,
 				discovery.NewK8sAPIDiscoverer(
-					config.K8sAPIDiscovery.ClusterIP, config.K8sAPIDiscovery.ClusterHostname,
+					config.K8sAPIDiscovery.KubeAPIIP, config.K8sAPIDiscovery.KubeAPIPort,
 					config.K8sAPIDiscovery.Namespace, config.K8sAPIDiscovery.KubectlPath,
 					config.K8sAPIDiscovery.KubectlTimeout,
 				),

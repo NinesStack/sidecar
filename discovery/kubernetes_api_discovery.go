@@ -15,29 +15,29 @@ import (
 // up on both the load balancer and the backing pods. It relies on an underlying
 // command to run the discovery. This is normally `kubectl`.
 type K8sAPIDiscoverer struct {
-	ClusterIP       string
-	ClusterHostname string
-	Namespace       string
+	Namespace string
 
-	Command K8sDiscoveryCommand
+	Command K8sDiscoveryAdapter
 
-	discovered *K8sServices
-	lock       sync.RWMutex
+	discoveredSvcs  *K8sServices
+	discoveredNodes *K8sNodes
+	lock            sync.RWMutex
 }
 
 // NewK8sAPIDiscoverer returns a properly configured K8sAPIDiscoverer
-func NewK8sAPIDiscoverer(clusterIP, clusterHostname, namespace,
+func NewK8sAPIDiscoverer(kubeHost string, kubePort int, namespace,
 	path string, timeout time.Duration) *K8sAPIDiscoverer {
 
 	return &K8sAPIDiscoverer{
-		discovered:      &K8sServices{},
-		ClusterIP:       clusterIP,
-		ClusterHostname: clusterHostname,
+		discoveredSvcs:  &K8sServices{},
+		discoveredNodes: &K8sNodes{},
 		Namespace:       namespace,
 		Command: &KubectlDiscoveryCommand{
 			Path:      path,
 			Namespace: namespace,
 			Timeout:   timeout,
+			KubeHost:  kubeHost,
+			KubePort:  kubePort,
 		},
 	}
 }
@@ -49,30 +49,51 @@ func (k *K8sAPIDiscoverer) Services() []service.Service {
 	k.lock.RLock()
 	defer k.lock.RUnlock()
 
+	// Enumerate all the K8s nodes we discovered, and for each one, emit all the
+	// services that we separately discovered. This means we will attempt to hit
+	// the NodePort for each of the nodes when looking for this service.
 	var services []service.Service
-	for _, item := range k.discovered.Items {
-		svc := service.Service{
-			ID:        item.Metadata.UID,
-			Name:      item.Metadata.Labels.ServiceName,
-			Image:     item.Metadata.Labels.ServiceName + ":kubernetes-hosted",
-			Created:   item.Metadata.CreationTimestamp,
-			Hostname:  k.ClusterHostname,
-			ProxyMode: "http",
-			Status:    service.ALIVE,
-			Updated:   time.Now().UTC(),
+	for _, node := range k.discoveredNodes.Items {
+		hostname, ip := getIPHostForNode(&node)
+
+		for _, item := range k.discoveredSvcs.Items {
+			svc := service.Service{
+				ID:        item.Metadata.UID,
+				Name:      item.Metadata.Labels.ServiceName,
+				Image:     item.Metadata.Labels.ServiceName + ":kubernetes-hosted",
+				Created:   item.Metadata.CreationTimestamp,
+				Hostname:  hostname,
+				ProxyMode: "http",
+				Status:    service.ALIVE,
+				Updated:   time.Now().UTC(),
+			}
+			for _, port := range item.Spec.Ports {
+				svc.Ports = append(svc.Ports, service.Port{
+					Type:        "tcp",
+					Port:        int64(port.NodePort),
+					ServicePort: int64(port.Port),
+					IP:          ip,
+				})
+			}
+			services = append(services, svc)
 		}
-		for _, port := range item.Spec.Ports {
-			svc.Ports = append(svc.Ports, service.Port{
-				Type:        "tcp",
-				Port:        int64(port.NodePort),
-				ServicePort: int64(port.Port),
-				IP:          k.ClusterIP,
-			})
-		}
-		services = append(services, svc)
 	}
 
 	return services
+}
+
+func getIPHostForNode(node *K8sNode) (hostname string, ip string) {
+	for _, address := range node.Status.Addresses {
+		if address.Type == "InternalIP" {
+			ip = address.Address
+		}
+
+		if address.Type == "Hostname" {
+			hostname = address.Address
+		}
+	}
+
+	return hostname, ip
 }
 
 // HealthCheck implements part of the Discoverer interface and returns the
@@ -92,17 +113,40 @@ func (k *K8sAPIDiscoverer) Listeners() []ChangeListener {
 // which is injected as a Looper.
 func (k *K8sAPIDiscoverer) Run(looper director.Looper) {
 	looper.Loop(func() error {
-		data, err := k.Command.Run()
+		data, err := k.getServices()
 		if err != nil {
-			log.Errorf("Failed to invoke K8s API discovery: %s", err)
+			log.Errorf("Failed to unmarshal services json: %s, %s", err, string(data))
 		}
 
-		k.lock.Lock()
-		err = json.Unmarshal(data, &k.discovered)
-		k.lock.Unlock()
+		data, err = k.getNodes()
 		if err != nil {
-			log.Errorf("Failed to unmarshal json: %s, %s", err, string(data))
+			log.Errorf("Failed to unmarshal nodes json: %s, %s", err, string(data))
 		}
+
 		return nil
 	})
+}
+
+func (k *K8sAPIDiscoverer) getServices() ([]byte, error) {
+	data, err := k.Command.GetServices()
+	if err != nil {
+		log.Errorf("Failed to invoke K8s API discovery: %s", err)
+	}
+
+	k.lock.Lock()
+	err = json.Unmarshal(data, &k.discoveredSvcs)
+	k.lock.Unlock()
+	return data, err
+}
+
+func (k *K8sAPIDiscoverer) getNodes() ([]byte, error) {
+	data, err := k.Command.GetNodes()
+	if err != nil {
+		log.Errorf("Failed to invoke K8s API discovery: %s", err)
+	}
+
+	k.lock.Lock()
+	err = json.Unmarshal(data, &k.discoveredNodes)
+	k.lock.Unlock()
+	return data, err
 }
