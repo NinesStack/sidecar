@@ -67,7 +67,7 @@ type StaticConfig struct {
 
 type K8sAPIConfig struct {
 	KubeAPIIP      string        `envconfig:"KUBE_API_IP" default:"127.0.0.1"`
-	KubeAPIPort    int           `envconfig:"KUBE_API_PORT" default:"localhost"`
+	KubeAPIPort    int           `envconfig:"KUBE_API_PORT" default:"8080"`
 	Namespace      string        `envconfig:"NAMESPACE" default:"default"`
 	KubectlPath    string        `envconfig:"KUBECTL_PATH" default:"/usr/local/bin/kubectl"`
 	KubectlTimeout time.Duration `envconfig:"KUBECTL_TIMEOUT" default:"3s"`
