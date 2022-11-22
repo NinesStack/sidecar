@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	cleanhttp "github.com/hashicorp/go-cleanhttp"
@@ -96,7 +97,6 @@ type K8sDiscoveryAdapter interface {
 
 // KubeAPIDiscoveryCommand is the main implementation for K8sDiscoveryCommand
 type KubeAPIDiscoveryCommand struct {
-	Path      string
 	Namespace string
 	Timeout   time.Duration
 
@@ -116,13 +116,14 @@ func NewKubeAPIDiscoveryCommand(kubeHost string, kubePort int, namespace string,
 		KubePort:  kubePort,
 	}
 	// Cache the secret from the file
-	data, err := ioutil.ReadFile(credsPath+"/token")
+	data, err := ioutil.ReadFile(credsPath + "/token")
 	if err != nil {
 		log.Errorf("Failed to read serviceaccount token: %s", err)
 		return nil
 	}
 
-	d.token = string(data)
+	// New line is illegal in tokens
+	d.token = strings.Replace(string(data), "\n", "", -1)
 
 	// Set up the timeout on a clean HTTP client
 	d.client = cleanhttp.DefaultClient()
@@ -134,9 +135,9 @@ func NewKubeAPIDiscoveryCommand(kubeHost string, kubePort int, namespace string,
 		rootCAs = x509.NewCertPool()
 	}
 
-	certs, err := ioutil.ReadFile(credsPath+"/ca.crt")
+	certs, err := ioutil.ReadFile(credsPath + "/ca.crt")
 	if err != nil {
-		log.Errorf("Failed to load CA cert file: %s", err)
+		log.Warnf("Failed to load CA cert file: %s", err)
 	}
 
 	if ok := rootCAs.AppendCertsFromPEM(certs); !ok {
@@ -177,6 +178,10 @@ func (d *KubeAPIDiscoveryCommand) makeRequest(path string) ([]byte, error) {
 		return []byte{}, fmt.Errorf("failed to fetch from K8s API '%s': %w", path, err)
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode > 299 || resp.StatusCode < 200 {
+		return []byte{}, fmt.Errorf("got unexpected response code from %s: %d", path, resp.StatusCode)
+	}
 
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {

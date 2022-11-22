@@ -70,7 +70,7 @@ type K8sAPIConfig struct {
 	KubeAPIPort int           `envconfig:"KUBE_API_PORT" default:"8080"`
 	Namespace   string        `envconfig:"NAMESPACE" default:"default"`
 	KubeTimeout time.Duration `envconfig:"KUBE_TIMEOUT" default:"3s"`
-	CredsPath   string `envconfig:"CREDS_PATH" default:"/var/run/secrets/kubernetes.io/serviceaccount"`
+	CredsPath   string        `envconfig:"CREDS_PATH" default:"/var/run/secrets/kubernetes.io/serviceaccount"`
 }
 
 type Config struct {
