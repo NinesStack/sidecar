@@ -16,6 +16,7 @@ require (
 	github.com/gogo/protobuf v1.2.1
 	github.com/golang/protobuf v1.4.2
 	github.com/gorilla/mux v1.6.2
+	github.com/hashicorp/go-cleanhttp v0.5.0
 	github.com/hashicorp/go-msgpack v0.5.5 // indirect
 	github.com/hashicorp/go-multierror v1.0.0 // indirect
 	github.com/hashicorp/go-sockaddr v1.0.0 // indirect

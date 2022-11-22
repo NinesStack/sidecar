@@ -1,10 +1,16 @@
 package discovery
 
 import (
+	"crypto/tls"
+	"crypto/x509"
 	"fmt"
-	"os"
-	"os/exec"
+	"io/ioutil"
+	"net/http"
+	"net/url"
 	"time"
+
+	cleanhttp "github.com/hashicorp/go-cleanhttp"
+	log "github.com/sirupsen/logrus"
 )
 
 // K8sServices represents the payload that is returned by `kubectl get services -o json`
@@ -76,8 +82,8 @@ type K8sNode struct {
 }
 
 type K8sNodeAddress struct {
-			Address string `json:"address"`
-			Type    string `json:"type"`
+	Address string `json:"address"`
+	Type    string `json:"type"`
 }
 
 // A K8sDiscoveryAdapter wraps a call to an external command that can be used
@@ -88,36 +94,102 @@ type K8sDiscoveryAdapter interface {
 	GetNodes() ([]byte, error)
 }
 
-// KubectlDiscoveryCommand is the main implementation for K8sDiscoveryCommand
-type KubectlDiscoveryCommand struct {
+// KubeAPIDiscoveryCommand is the main implementation for K8sDiscoveryCommand
+type KubeAPIDiscoveryCommand struct {
 	Path      string
 	Namespace string
 	Timeout   time.Duration
 
 	KubeHost string
 	KubePort int
+
+	token  string
+	client *http.Client
 }
 
-func (d *KubectlDiscoveryCommand) addVars(varlist []string) []string {
-	addedEnvVars := []string{
-		"KUBERNETES_SERVICE_HOST=" + d.KubeHost, fmt.Sprintf("KUBERNETES_SERVICE_PORT=%d", d.KubePort),
+// NewKubeAPIDiscoveryCommand returns a properly configured KubeAPIDiscoveryCommand
+func NewKubeAPIDiscoveryCommand(kubeHost string, kubePort int, namespace string, timeout time.Duration, credsPath string) *KubeAPIDiscoveryCommand {
+	d := &KubeAPIDiscoveryCommand{
+		Namespace: namespace,
+		Timeout:   timeout,
+		KubeHost:  kubeHost,
+		KubePort:  kubePort,
+	}
+	// Cache the secret from the file
+	data, err := ioutil.ReadFile(credsPath+"/token")
+	if err != nil {
+		log.Errorf("Failed to read serviceaccount token: %s", err)
+		return nil
 	}
 
-	return append(varlist, addedEnvVars...)
+	d.token = string(data)
+
+	// Set up the timeout on a clean HTTP client
+	d.client = cleanhttp.DefaultClient()
+	d.client.Timeout = d.Timeout
+
+	// Get the SystemCertPool — on error we have empty pool
+	rootCAs, _ := x509.SystemCertPool()
+	if rootCAs == nil {
+		rootCAs = x509.NewCertPool()
+	}
+
+	certs, err := ioutil.ReadFile(credsPath+"/ca.crt")
+	if err != nil {
+		log.Errorf("Failed to load CA cert file: %s", err)
+	}
+
+	if ok := rootCAs.AppendCertsFromPEM(certs); !ok {
+		log.Warn("No certs appended! Using system certs only")
+	}
+
+	// Add the pool to the TLS config we'll use in the client.
+	config := &tls.Config{
+		RootCAs: rootCAs,
+	}
+
+	d.client.Transport = &http.Transport{TLSClientConfig: config}
+
+	return d
 }
 
-func (d *KubectlDiscoveryCommand) GetServices() ([]byte, error) {
-	// Run `kubectl` from the specific path, and namespace, and return data as
-	// JSON, to be parsed by the Discoverer
-	cmd := exec.Command(d.Path, "-n", d.Namespace, "get", "services", "-o", "json", "--request-timeout", d.Timeout.String())
-	cmd.Env = d.addVars(os.Environ()) // Pass through the environment variables
-	return cmd.CombinedOutput()
+func (d *KubeAPIDiscoveryCommand) makeRequest(path string) ([]byte, error) {
+	var scheme = "http"
+	if d.KubePort == 443 {
+		scheme = "https"
+	}
+
+	apiURL := url.URL{
+		Scheme: scheme,
+		Host:   fmt.Sprintf("%s:%d", d.KubeHost, d.KubePort),
+		Path:   path,
+	}
+
+	req, err := http.NewRequest("GET", apiURL.String(), nil)
+	if err != nil {
+		return []byte{}, err
+	}
+
+	req.Header.Set("Authorization", "Bearer "+d.token)
+
+	resp, err := d.client.Do(req)
+	if err != nil {
+		return []byte{}, fmt.Errorf("failed to fetch from K8s API '%s': %w", path, err)
+	}
+	defer resp.Body.Close()
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return []byte{}, fmt.Errorf("failed to read from K8s API '%s' response body: %w", path, err)
+	}
+
+	return body, nil
 }
 
-func (d *KubectlDiscoveryCommand) GetNodes() ([]byte, error) {
-	// Run `kubectl` from the specific path, and namespace, and return data as
-	// JSON, to be parsed by the Discoverer
-	cmd := exec.Command(d.Path, "-n", d.Namespace, "get", "nodes", "-o", "json", "--request-timeout", d.Timeout.String())
-	cmd.Env = d.addVars(os.Environ()) // Pass through the environment variables
-	return cmd.CombinedOutput()
+func (d *KubeAPIDiscoveryCommand) GetServices() ([]byte, error) {
+	return d.makeRequest("/api/v1/services/")
+}
+
+func (d *KubeAPIDiscoveryCommand) GetNodes() ([]byte, error) {
+	return d.makeRequest("/api/v1/nodes/")
 }

@@ -13,6 +13,8 @@ import (
 	. "github.com/smartystreets/goconvey/convey"
 )
 
+var credsPath string = "fixtures"
+
 type mockK8sDiscoveryCommand struct {
 	GetServicesShouldError      bool
 	GetServicesShouldReturnJunk bool
@@ -105,17 +107,13 @@ func (m *mockK8sDiscoveryCommand) GetNodes() ([]byte, error) {
 func Test_NewK8sAPIDiscoverer(t *testing.T) {
 	Convey("NewK8sAPIDiscoverer()", t, func() {
 		Convey("returns a properly configured K8sAPIDiscoverer", func() {
-			disco := NewK8sAPIDiscoverer("127.0.0.1", 443, "heorot", "/usr/local/somewhere", 3*time.Second)
+			disco := NewK8sAPIDiscoverer("127.0.0.1", 443, "heorot", 3*time.Second, credsPath)
 
 			So(disco.discoveredSvcs, ShouldNotBeNil)
 			So(disco.Namespace, ShouldEqual, "heorot")
-			So(disco.Command, ShouldResemble, &KubectlDiscoveryCommand{
-				Path: "/usr/local/somewhere", Namespace: "heorot",
-				Timeout: 3 * time.Second,
-				KubeHost:"127.0.0.1", KubePort:443,
-			})
+			So(disco.Command, ShouldNotBeNil)
 
-			command := disco.Command.(*KubectlDiscoveryCommand)
+			command := disco.Command.(*KubeAPIDiscoveryCommand)
 			So(command.KubeHost, ShouldEqual, "127.0.0.1")
 			So(command.KubePort, ShouldEqual, 443)
 		})
@@ -124,7 +122,7 @@ func Test_NewK8sAPIDiscoverer(t *testing.T) {
 
 func Test_K8sHealthCheck(t *testing.T) {
 	Convey("HealthCheck() always returns 'AlwaysSuccessful'", t, func() {
-		disco := NewK8sAPIDiscoverer("127.0.0.1", 443, "heorot", "/usr/local/somewhere", 3*time.Second)
+		disco := NewK8sAPIDiscoverer("127.0.0.1", 443, "heorot", 3*time.Second, credsPath)
 		check, args := disco.HealthCheck(nil)
 		So(check, ShouldEqual, "AlwaysSuccessful")
 		So(args, ShouldBeEmpty)
@@ -133,7 +131,7 @@ func Test_K8sHealthCheck(t *testing.T) {
 
 func Test_K8sListeners(t *testing.T) {
 	Convey("Listeners() always returns and empty slice", t, func() {
-		disco := NewK8sAPIDiscoverer("127.0.0.1", 443, "heorot", "/usr/local/somewhere", 3*time.Second)
+		disco := NewK8sAPIDiscoverer("127.0.0.1", 443, "heorot", 3*time.Second, credsPath)
 		listeners := disco.Listeners()
 		So(listeners, ShouldBeEmpty)
 	})
@@ -141,7 +139,7 @@ func Test_K8sListeners(t *testing.T) {
 
 func Test_K8sGetServices(t *testing.T) {
 	Convey("GetServices()", t, func() {
-		disco := NewK8sAPIDiscoverer("127.0.0.1", 443, "heorot", "/usr/local/somewhere", 3*time.Second)
+		disco := NewK8sAPIDiscoverer("127.0.0.1", 443, "heorot", 3*time.Second, credsPath)
 		mock := &mockK8sDiscoveryCommand{}
 		disco.Command = mock
 
@@ -184,7 +182,7 @@ func Test_K8sGetServices(t *testing.T) {
 
 func Test_K8sGetNodes(t *testing.T) {
 	Convey("GetNodes()", t, func() {
-		disco := NewK8sAPIDiscoverer("127.0.0.1", 443, "heorot", "/usr/local/somewhere", 3*time.Second)
+		disco := NewK8sAPIDiscoverer("127.0.0.1", 443, "heorot", 3*time.Second, credsPath)
 		mock := &mockK8sDiscoveryCommand{}
 		disco.Command = mock
 
@@ -227,7 +225,7 @@ func Test_K8sGetNodes(t *testing.T) {
 
 func Test_K8sServices(t *testing.T) {
 	Convey("Services()", t, func() {
-		disco := NewK8sAPIDiscoverer("127.0.0.1", 443, "heorot", "/usr/local/somewhere", 3*time.Second)
+		disco := NewK8sAPIDiscoverer("127.0.0.1", 443, "heorot", 3*time.Second, credsPath)
 		mock := &mockK8sDiscoveryCommand{}
 		disco.Command = mock
 

@@ -25,20 +25,15 @@ type K8sAPIDiscoverer struct {
 }
 
 // NewK8sAPIDiscoverer returns a properly configured K8sAPIDiscoverer
-func NewK8sAPIDiscoverer(kubeHost string, kubePort int, namespace,
-	path string, timeout time.Duration) *K8sAPIDiscoverer {
+func NewK8sAPIDiscoverer(kubeHost string, kubePort int, namespace string, timeout time.Duration, credsPath string) *K8sAPIDiscoverer {
+
+	cmd := NewKubeAPIDiscoveryCommand(kubeHost, kubePort, namespace, timeout, credsPath)
 
 	return &K8sAPIDiscoverer{
 		discoveredSvcs:  &K8sServices{},
 		discoveredNodes: &K8sNodes{},
 		Namespace:       namespace,
-		Command: &KubectlDiscoveryCommand{
-			Path:      path,
-			Namespace: namespace,
-			Timeout:   timeout,
-			KubeHost:  kubeHost,
-			KubePort:  kubePort,
-		},
+		Command:         cmd,
 	}
 }
 
