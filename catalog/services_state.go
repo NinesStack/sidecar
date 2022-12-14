@@ -297,7 +297,7 @@ func (state *ServicesState) AddServiceEntry(newSvc service.Service) {
 	defer state.Unlock()
 
 	// Some weird edge cases can cause very old stuff to get broadcast.  This
-	// can end up in a broadcast/tombstone/broadcase loop. We'll attempt to
+	// can end up in a broadcast/tombstone/broadcast loop. We'll attempt to
 	// prevent that by dropping anything older than the tombstone window.
 	if newSvc.IsStale(TOMBSTONE_LIFESPAN) {
 		log.Warnf(
