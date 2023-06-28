@@ -310,6 +310,11 @@ func (state *ServicesState) AddServiceEntry(newSvc service.Service) {
 		// happen in very rare circumstances.
 		server, ok := state.Servers[newSvc.Hostname]
 		if ok && server.HasService(newSvc.ID) {
+			log.Warnf(
+				"Found stale service in state, removing: %s:%s (%s)",
+				newSvc.Hostname, newSvc.Name, newSvc.ID,
+			)
+
 			// Remove the service
 			delete(state.Servers[newSvc.Hostname].Services, newSvc.ID)
 
