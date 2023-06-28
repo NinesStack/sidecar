@@ -453,7 +453,7 @@ func Test_TrackingAndBroadcasting(t *testing.T) {
 
 		Convey("Tombstones have a lifespan, then expire", func() {
 			service1.Tombstone()
-			service1.Updated = service1.Updated.Add(0 - TOMBSTONE_LIFESPAN - 1*time.Minute)
+			service1.Updated = service1.Updated.Add(0 - TOMBSTONE_LIFESPAN - 50*time.Second)
 			state.AddServiceEntry(service1)
 			state.AddServiceEntry(service2)
 			So(state.Servers[hostname].Services[service1.ID], ShouldNotBeNil)
@@ -474,6 +474,20 @@ func Test_TrackingAndBroadcasting(t *testing.T) {
 
 			So(state.Servers[hostname], ShouldNotBeNil)
 			state.TombstoneOthersServices()
+			So(state.Servers[hostname], ShouldBeNil)
+		})
+
+		Convey("When we receive a stale broadcast we remove any records we have", func() {
+			state := NewServicesState() // Totally empty
+			state.Hostname = hostname
+			state.AddServiceEntry(service1)
+			state.Servers[hostname].Services[service1.ID].Tombstone()
+			state.Servers[hostname].Services[service1.ID].Updated =
+				service1.Updated.Add(TOMBSTONE_LIFESPAN - 2*time.Minute)
+
+			So(state.Servers[hostname], ShouldNotBeNil)
+			service1.Updated = time.Unix(0, 0)
+			state.AddServiceEntry(service1)
 			So(state.Servers[hostname], ShouldBeNil)
 		})
 

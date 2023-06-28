@@ -287,6 +287,26 @@ func (state *ServicesState) GetListeners() []Listener {
 	return listeners
 }
 
+// RemoveServiceEntry is intended to be called inside a lock. It removes the
+// service entry and also the server if this service was the last entry.
+func (state *ServicesState) RemoveServiceEntry(newSvc service.Service) {
+	server, ok := state.Servers[newSvc.Hostname]
+	if ok && server.HasService(newSvc.ID) {
+		log.Warnf(
+			"Found stale service in state, removing: %s:%s (%s)",
+			newSvc.Hostname, newSvc.Name, newSvc.ID,
+		)
+
+		// Remove the service
+		delete(state.Servers[newSvc.Hostname].Services, newSvc.ID)
+
+		// If this is the last service, remove the server
+		if len(state.Servers[newSvc.Hostname].Services) < 1 {
+			delete(state.Servers, newSvc.Hostname)
+		}
+	}
+}
+
 // Take a service and merge it into our state. Correctly handle
 // timestamps so we only add things newer than what we already
 // know about. Retransmits updates to cluster peers.
@@ -305,24 +325,11 @@ func (state *ServicesState) AddServiceEntry(newSvc service.Service) {
 			newSvc.Hostname, newSvc.Name, newSvc.ID,
 		)
 
+
 		// Do we somehow already have this stale thing in our state? We
 		// shouldn't. Let's clean it out if we somehow do. This seems to
 		// happen in very rare circumstances.
-		server, ok := state.Servers[newSvc.Hostname]
-		if ok && server.HasService(newSvc.ID) {
-			log.Warnf(
-				"Found stale service in state, removing: %s:%s (%s)",
-				newSvc.Hostname, newSvc.Name, newSvc.ID,
-			)
-
-			// Remove the service
-			delete(state.Servers[newSvc.Hostname].Services, newSvc.ID)
-
-			// If this is the last service, remove the server
-			if len(state.Servers[newSvc.Hostname].Services) < 1 {
-				delete(state.Servers, newSvc.Hostname)
-			}
-		}
+		state.RemoveServiceEntry(newSvc)
 		return
 	}
 
@@ -663,12 +670,7 @@ func (state *ServicesState) TombstoneOthersServices() []service.Service {
 	state.EachService(func(hostname *string, id *string, svc *service.Service) {
 		if svc.IsTombstone() &&
 			svc.Updated.Before(time.Now().UTC().Add(0-TOMBSTONE_LIFESPAN)) {
-			delete(state.Servers[*hostname].Services, *id)
-
-			// If this is the last service, remove the server
-			if len(state.Servers[*hostname].Services) < 1 {
-				delete(state.Servers, *hostname)
-			}
+			state.RemoveServiceEntry(*svc)
 		}
 
 		svcLifespan := ALIVE_LIFESPAN
