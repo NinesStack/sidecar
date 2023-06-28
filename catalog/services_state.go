@@ -304,6 +304,20 @@ func (state *ServicesState) AddServiceEntry(newSvc service.Service) {
 			"Dropping stale service received on gossip: %s:%s (%s)",
 			newSvc.Hostname, newSvc.Name, newSvc.ID,
 		)
+
+		// Do we somehow already have this stale thing in our state? We
+		// shouldn't. Let's clean it out if we somehow do. This seems to
+		// happen in very rare circumstances.
+		server, ok := state.Servers[newSvc.Hostname]
+		if ok && server.HasService(newSvc.ID) {
+			// Remove the service
+			delete(state.Servers[newSvc.Hostname].Services, newSvc.ID)
+
+			// If this is the last service, remove the server
+			if len(state.Servers[newSvc.Hostname].Services) < 1 {
+				delete(state.Servers, newSvc.Hostname)
+			}
+		}
 		return
 	}
 
