@@ -379,7 +379,7 @@ func Test_K8sServices(t *testing.T) {
 
 				So(len(services), ShouldEqual, 1)
 				svc := services[0]
-				So(svc.ID, ShouldEqual, "107b5bbf-9640-4fd0-b5de-1e898e8ae9f7")
+				So(svc.ID, ShouldEqual, "kubernetes-hosted")
 				So(svc.Name, ShouldEqual, "chopper")
 				So(svc.Image, ShouldEqual, "somewhere/chopper:54e623d")
 				So(svc.Created.String(), ShouldEqual, "2022-11-07 13:18:03 +0000 UTC")
