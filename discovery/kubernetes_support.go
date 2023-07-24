@@ -16,55 +16,63 @@ import (
 
 // K8sServices represents the payload that is returned by `kubectl get services -o json`
 type K8sServices struct {
-	APIVersion string `json:"apiVersion"`
-	Items      []struct {
-		APIVersion string `json:"apiVersion"`
-		Kind       string `json:"kind"`
-		Metadata   struct {
-			Annotations struct {
-				KubectlKubernetesIoLastAppliedConfiguration string `json:"kubectl.kubernetes.io/last-applied-configuration"`
-			} `json:"annotations"`
-			CreationTimestamp time.Time `json:"creationTimestamp"`
-			Labels            struct {
-				Environment string `json:"Environment"`
-				ServiceName string `json:"ServiceName"`
-			} `json:"labels"`
-			Name            string `json:"name"`
-			Namespace       string `json:"namespace"`
-			ResourceVersion string `json:"resourceVersion"`
-			UID             string `json:"uid"`
-		} `json:"metadata"`
-		Spec struct {
-			ClusterIP             string   `json:"clusterIP"`
-			ClusterIPs            []string `json:"clusterIPs"`
-			InternalTrafficPolicy string   `json:"internalTrafficPolicy"`
-			IPFamilies            []string `json:"ipFamilies"`
-			IPFamilyPolicy        string   `json:"ipFamilyPolicy"`
-			Ports                 []struct {
-				Port       int    `json:"port"`
-				Protocol   string `json:"protocol"`
-				// This field mutates types when served from the K8s API. This is bad
-				// API design, and means this won't parse with Go's stdlib JSON support.
-				// Commenting out so that this reason is clear.
-				// TargetPort int    `json:"targetPort"`
-				NodePort   int    `json:"nodePort"`
-			} `json:"ports"`
-			Selector struct {
-				Environment string `json:"Environment"`
-				ServiceName string `json:"ServiceName"`
-			} `json:"selector"`
-			SessionAffinity string `json:"sessionAffinity"`
-			Type            string `json:"type"`
-		} `json:"spec"`
-		Status struct {
-			LoadBalancer struct {
-			} `json:"loadBalancer"`
-		} `json:"status"`
-	} `json:"items"`
-	Kind     string `json:"kind"`
-	Metadata struct {
+	APIVersion string       `json:"apiVersion"`
+	Items      []K8sService `json:"items"`
+	Kind       string       `json:"kind"`
+	Metadata   struct {
 		ResourceVersion string `json:"resourceVersion"`
 	} `json:"metadata"`
+}
+
+// A K8sService represents a single service from the K8sServices response
+type K8sService struct {
+	APIVersion string `json:"apiVersion"`
+	Kind       string `json:"kind"`
+	Metadata   struct {
+		Annotations struct {
+			KubectlKubernetesIoLastAppliedConfiguration string `json:"kubectl.kubernetes.io/last-applied-configuration"`
+		} `json:"annotations"`
+		CreationTimestamp time.Time `json:"creationTimestamp"`
+		Labels            struct {
+			Environment string `json:"Environment"`
+			ServiceName string `json:"ServiceName"`
+		} `json:"labels"`
+		Name            string `json:"name"`
+		Namespace       string `json:"namespace"`
+		ResourceVersion string `json:"resourceVersion"`
+		UID             string `json:"uid"`
+	} `json:"metadata"`
+	Spec struct {
+		ClusterIP             string   `json:"clusterIP"`
+		ClusterIPs            []string `json:"clusterIPs"`
+		InternalTrafficPolicy string   `json:"internalTrafficPolicy"`
+		IPFamilies            []string `json:"ipFamilies"`
+		IPFamilyPolicy        string   `json:"ipFamilyPolicy"`
+		Ports                 []struct {
+			Port     int    `json:"port"`
+			Protocol string `json:"protocol"`
+			// This field mutates types when served from the K8s API. This is bad
+			// API design, and means this won't parse with Go's stdlib JSON support.
+			// Commenting out so that this reason is clear.
+			// TargetPort int    `json:"targetPort"`
+			NodePort int `json:"nodePort"`
+		} `json:"ports"`
+		Selector struct {
+			Environment string `json:"Environment"`
+			ServiceName string `json:"ServiceName"`
+		} `json:"selector"`
+		SessionAffinity string `json:"sessionAffinity"`
+		Type            string `json:"type"`
+	} `json:"spec"`
+	Status struct {
+		LoadBalancer struct {
+		} `json:"loadBalancer"`
+	} `json:"status"`
+}
+
+// ServiceName extracts and returns the service name
+func (svc *K8sService) ServiceName() string {
+	return svc.Metadata.Labels.ServiceName
 }
 
 // K8sServices represents a cut-down version of the payload that is returned by
@@ -83,11 +91,105 @@ type K8sNode struct {
 	Status struct {
 		Addresses []K8sNodeAddress `json:"addresses"`
 	} `json:"status"`
+	Metadata struct {
+		Name string `json:"name"`
+	} `json:"metadata"`
 }
 
 type K8sNodeAddress struct {
 	Address string `json:"address"`
 	Type    string `json:"type"`
+}
+
+// A K8sPods is what the API returns for a list of pods. We parse out the
+// fields that we care about.
+type K8sPods struct {
+	Kind       string `json:"kind"`
+	APIVersion string `json:"apiVersion"`
+	Metadata   struct {
+		ResourceVersion string `json:"resourceVersion"`
+	} `json:"metadata"`
+	Items []K8sPod `json:"items"`
+}
+
+// A K8sPod is an API response representing a single Pod
+type K8sPod struct {
+	Metadata struct {
+		Name              string    `json:"name"`
+		Namespace         string    `json:"namespace"`
+		CreationTimestamp time.Time `json:"creationTimestamp"`
+		Labels            struct {
+			Environment string `json:"Environment"`
+			ServiceName string `json:"ServiceName"`
+			App         string `json:"app"`
+			Release     string `json:"Release"`
+		} `json:"labels"`
+	} `json:"metadata"`
+	Spec struct {
+		Containers []struct {
+			Name  string `json:"name"`
+			Image string `json:"image"`
+			Ports []struct {
+				Name          string `json:"name"`
+				ContainerPort int    `json:"containerPort"`
+				Protocol      string `json:"protocol"`
+			} `json:"ports,omitempty"`
+		} `json:"containers"`
+		NodeName string `json:"nodeName"`
+	} `json:"spec"`
+	Status struct {
+		Phase      string `json:"phase"`
+		Conditions []struct {
+			Type               string      `json:"type"`
+			Status             string      `json:"status"`
+			LastProbeTime      interface{} `json:"lastProbeTime"`
+			LastTransitionTime time.Time   `json:"lastTransitionTime"`
+		} `json:"conditions"`
+		HostIP string `json:"hostIP"`
+		PodIP  string `json:"podIP"`
+		PodIPs []struct {
+			IP string `json:"ip"`
+		} `json:"podIPs"`
+		StartTime         time.Time               `json:"startTime"`
+		ContainerStatuses []K8sPodContainerStatus `json:"containerStatuses"`
+	} `json:"status"`
+}
+
+func (p *K8sPod) ServiceName() string {
+	return p.Metadata.Labels.ServiceName
+}
+
+func (p *K8sPod) Image() string {
+	if len(p.Spec.Containers) < 1 {
+		return ""
+	}
+
+	// In theory the first one should be the main container image. There is no
+	// other real way to tell if a side car container is running in the pod.
+	return p.Spec.Containers[0].Image
+}
+
+type K8sPodContainerStatus struct {
+	Name  string `json:"name"`
+	State struct {
+		Running struct {
+			StartedAt time.Time `json:"startedAt"`
+		} `json:"running"`
+		Terminated struct {
+			ExitCode    int       `json:"exitCode"`
+			Reason      string    `json:"reason"`
+			StartedAt   time.Time `json:"startedAt"`
+			FinishedAt  time.Time `json:"finishedAt"`
+			ContainerID string    `json:"containerID"`
+		} `json:"terminated"`
+	} `json:"state"`
+	LastState struct {
+	} `json:"lastState"`
+	Ready        bool   `json:"ready"`
+	RestartCount int    `json:"restartCount"`
+	Image        string `json:"image"`
+	ImageID      string `json:"imageID"`
+	ContainerID  string `json:"containerID"`
 }
 
 // A K8sDiscoveryAdapter wraps a call to an external command that can be used
@@ -96,6 +198,7 @@ type K8sNodeAddress struct {
 type K8sDiscoveryAdapter interface {
 	GetServices() ([]byte, error)
 	GetNodes() ([]byte, error)
+	GetPods() ([]byte, error)
 }
 
 // KubeAPIDiscoveryCommand is the main implementation for K8sDiscoveryCommand
@@ -200,4 +303,9 @@ func (d *KubeAPIDiscoveryCommand) GetServices() ([]byte, error) {
 
 func (d *KubeAPIDiscoveryCommand) GetNodes() ([]byte, error) {
 	return d.makeRequest("/api/v1/nodes/")
+}
+
+func (d *KubeAPIDiscoveryCommand) GetPods() ([]byte, error) {
+	return d.makeRequest("/api/v1/namespaces/" + d.Namespace + "/pods?limit=10000")
+
 }
