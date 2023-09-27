@@ -13,7 +13,7 @@ require (
 	github.com/containerd/continuity v0.0.0-20181203112020-004b46473808 // indirect
 	github.com/envoyproxy/go-control-plane v0.9.6
 	github.com/fsouza/go-dockerclient v1.3.1
-	github.com/gogo/protobuf v1.2.1
+	github.com/gogo/protobuf v1.3.2
 	github.com/golang/protobuf v1.4.2
 	github.com/gorilla/mux v1.6.2
 	github.com/hashicorp/go-cleanhttp v0.5.0
@@ -24,7 +24,7 @@ require (
 	github.com/jarcoal/httpmock v1.2.0
 	github.com/kelseyhightower/envconfig v1.3.0
 	github.com/mattn/go-isatty v0.0.3 // indirect
-	github.com/miekg/dns v1.0.14 // indirect
+	github.com/miekg/dns v1.1.25 // indirect
 	github.com/mohae/deepcopy v0.0.0-20170929034955-c48cc78d4826
 	github.com/onsi/gomega v1.4.2 // indirect
 	github.com/pquerna/ffjson v0.0.0-20171002144729-d49c2bc1aa13
