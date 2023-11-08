@@ -19,25 +19,25 @@ type K8sAPIDiscoverer struct {
 
 	Command K8sDiscoveryAdapter
 
-	discoveredSvcs   *K8sServices
+	discoveredSvcs   map[string]*K8sService
 	discoveredNodes  *K8sNodes
+	discoveredPods   map[string][]*K8sPod
 	lock             sync.RWMutex
-	announceAllNodes bool
 	hostname         string
 }
 
 // NewK8sAPIDiscoverer returns a properly configured K8sAPIDiscoverer
 func NewK8sAPIDiscoverer(kubeHost string, kubePort int, namespace string, timeout time.Duration,
-	credsPath string, announceAllNodes bool, hostname string) *K8sAPIDiscoverer {
+	credsPath string, hostname string) *K8sAPIDiscoverer {
 
 	cmd := NewKubeAPIDiscoveryCommand(kubeHost, kubePort, namespace, timeout, credsPath)
 
 	return &K8sAPIDiscoverer{
-		discoveredSvcs:   &K8sServices{},
+		discoveredSvcs:   make(map[string]*K8sService),
+		discoveredPods:   make(map[string][]*K8sPod),
 		discoveredNodes:  &K8sNodes{},
 		Namespace:        namespace,
 		Command:          cmd,
-		announceAllNodes: announceAllNodes,
 		hostname:         hostname,
 	}
 }
@@ -48,37 +48,48 @@ func NewK8sAPIDiscoverer(kubeHost string, kubePort int, namespace string, timeou
 func (k *K8sAPIDiscoverer) servicesForNode(hostname, ip string) []service.Service {
 	var services []service.Service
 
-	for _, item := range k.discoveredSvcs.Items {
-		// We require an annotation called 'ServiceName' to make sure this is
-		// a service we want to announce.
-		if item.Metadata.Labels.ServiceName == "" {
-			continue
-		}
-
-		svc := service.Service{
-			ID:        item.Metadata.UID,
-			Name:      item.Metadata.Labels.ServiceName,
-			Image:     item.Metadata.Labels.ServiceName + ":kubernetes-hosted",
-			Created:   item.Metadata.CreationTimestamp,
-			Hostname:  hostname,
-			ProxyMode: "http",
-			Status:    service.ALIVE,
-			Updated:   time.Now().UTC(),
-		}
-
-		for _, port := range item.Spec.Ports {
-			// We only support entries with NodePort defined
-			if port.NodePort < 1 {
+	for svcName, podList := range k.discoveredPods {
+		for _, pod := range podList {
+			// We require an annotation called 'ServiceName' to make sure this is
+			// a service we want to announce.
+			if pod.ServiceName() == "" {
 				continue
 			}
-			svc.Ports = append(svc.Ports, service.Port{
-				Type:        "tcp",
-				Port:        int64(port.NodePort),
-				ServicePort: int64(port.Port),
-				IP:          ip,
-			})
+
+			if pod.Spec.NodeName != hostname {
+				continue
+			}
+
+			// If we don't have a service from K8s, then there are no ports to expose
+			if k.discoveredPods[pod.ServiceName()] == nil {
+				continue
+			}
+
+			svc := service.Service{
+				ID:        "kubernetes-hosted",
+				Name:      svcName,
+				Image:     pod.Image(),
+				Created:   pod.Metadata.CreationTimestamp,
+				Hostname:  pod.Spec.NodeName,
+				ProxyMode: "http",
+				Status:    service.ALIVE,
+				Updated:   time.Now().UTC(),
+			}
+
+			for _, port := range k.discoveredSvcs[pod.ServiceName()].Spec.Ports {
+				// We only support entries with NodePort defined
+				if port.NodePort < 1 {
+					continue
+				}
+				svc.Ports = append(svc.Ports, service.Port{
+					Type:        "tcp",
+					Port:        int64(port.NodePort),
+					ServicePort: int64(port.Port),
+					IP:          ip,
+				})
+			}
+			services = append(services, svc)
 		}
-		services = append(services, svc)
 	}
 
 	return services
@@ -96,11 +107,6 @@ func (k *K8sAPIDiscoverer) Services() []service.Service {
 	var services []service.Service
 	for _, node := range k.discoveredNodes.Items {
 		hostname, ip := getIPHostForNode(&node)
-		if k.announceAllNodes {
-			nodeServices := k.servicesForNode(hostname, ip)
-			services = append(services, nodeServices...)
-			continue
-		}
 
 		// Don't discover all nodes, only this one. Short circuit if we found it
 		// since we'll only be in the list once.
@@ -143,17 +149,41 @@ func (k *K8sAPIDiscoverer) Listeners() []ChangeListener {
 // Run is part of the Discoverer interface and calls the Command in a loop,
 // which is injected as a Looper.
 func (k *K8sAPIDiscoverer) Run(looper director.Looper) {
+	var (
+		data []byte
+		err  error
+	)
 	looper.Loop(func() error {
-		data, err := k.getServices()
-		if err != nil {
-			log.Errorf("Failed to unmarshal services json: %s, %s", err, string(data))
-		}
+		var wg sync.WaitGroup
 
-		data, err = k.getNodes()
-		if err != nil {
-			log.Errorf("Failed to unmarshal nodes json: %s, %s", err, string(data))
-		}
+		wg.Add(1)
+		go func() {
+			data, err := k.getServices()
+			if err != nil {
+				log.Errorf("Failed to unmarshal services json: %s, %s", err, string(data))
+			}
+			wg.Done()
+		}()
 
+		wg.Add(1)
+		go func() {
+			data, err = k.getNodes()
+			if err != nil {
+				log.Errorf("Failed to unmarshal nodes json: %s, %s", err, string(data))
+			}
+			wg.Done()
+		}()
+
+		wg.Add(1)
+		go func() {
+			data, err = k.getPods()
+			if err != nil {
+				log.Errorf("Failed to unmarshal pods json: %s, %s", err, string(data))
+			}
+			wg.Done()
+		}()
+
+		wg.Wait()
 		return nil
 	})
 }
@@ -164,8 +194,17 @@ func (k *K8sAPIDiscoverer) getServices() ([]byte, error) {
 		log.Errorf("Failed to invoke K8s API discovery: %s", err)
 	}
 
+	var svcs K8sServices
+
+	err = json.Unmarshal(data, &svcs)
+	if err != nil {
+		return data, err
+	}
+
 	k.lock.Lock()
-	err = json.Unmarshal(data, &k.discoveredSvcs)
+	for _, svc := range svcs.Items {
+		k.discoveredSvcs[svc.ServiceName()] = &svc
+	}
 	k.lock.Unlock()
 	return data, err
 }
@@ -178,6 +217,27 @@ func (k *K8sAPIDiscoverer) getNodes() ([]byte, error) {
 
 	k.lock.Lock()
 	err = json.Unmarshal(data, &k.discoveredNodes)
+	k.lock.Unlock()
+	return data, err
+}
+
+func (k *K8sAPIDiscoverer) getPods() ([]byte, error) {
+	data, err := k.Command.GetPods()
+	if err != nil {
+		log.Errorf("Failed to invoke K8s API discovery: %s", err)
+	}
+
+	var pods K8sPods
+
+	err = json.Unmarshal(data, &pods)
+	if err != nil {
+		return data, err
+	}
+
+	k.lock.Lock()
+	for _, pod := range pods.Items {
+		k.discoveredPods[pod.ServiceName()] = append(k.discoveredPods[pod.ServiceName()], &pod)
+	}
 	k.lock.Unlock()
 	return data, err
 }
