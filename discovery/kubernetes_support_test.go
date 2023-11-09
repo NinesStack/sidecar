@@ -75,7 +75,7 @@ func Test_makeRequest(t *testing.T) {
 				},
 			)
 
-			body, err := cmd.makeRequest("/nowhere")
+			body, err := cmd.makeRequest("/nowhere", "")
 			So(err, ShouldBeNil)
 			So(auth, ShouldStartWith, "Bearer ")
 			So(auth, ShouldContainSubstring, "this would be a token")
@@ -92,7 +92,7 @@ func Test_makeRequest(t *testing.T) {
 				},
 			)
 
-			body, err := cmd.makeRequest("/nowhere")
+			body, err := cmd.makeRequest("/nowhere", "")
 			So(err, ShouldNotBeNil)
 			So(auth, ShouldStartWith, "Bearer ")
 			So(auth, ShouldContainSubstring, "this would be a token")
@@ -106,7 +106,7 @@ func Test_makeRequest(t *testing.T) {
 				httpmock.NewErrorResponder(errors.New("intentional test error")),
 			)
 
-			body, err := cmd.makeRequest("/nowhere")
+			body, err := cmd.makeRequest("/nowhere", "")
 
 			So(err, ShouldNotBeNil)
 			So(err.Error(), ShouldContainSubstring, "intentional test error")

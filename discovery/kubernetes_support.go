@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	cleanhttp "github.com/hashicorp/go-cleanhttp"
@@ -228,8 +229,7 @@ func NewKubeAPIDiscoveryCommand(kubeHost string, kubePort int, namespace string,
 	}
 
 	// New line is illegal in tokens
-	//d.token = strings.Replace(string(data), "\n", "", -1)
-	d.token = string(data)
+	d.token = strings.Replace(string(data), "\n", "", -1)
 
 	// Set up the timeout on a clean HTTP client
 	d.client = cleanhttp.DefaultClient()
@@ -260,7 +260,7 @@ func NewKubeAPIDiscoveryCommand(kubeHost string, kubePort int, namespace string,
 	return d
 }
 
-func (d *KubeAPIDiscoveryCommand) makeRequest(path string) ([]byte, error) {
+func (d *KubeAPIDiscoveryCommand) makeRequest(path string, params string) ([]byte, error) {
 	var scheme = "http"
 	if d.KubePort == 443 {
 		scheme = "https"
@@ -272,14 +272,12 @@ func (d *KubeAPIDiscoveryCommand) makeRequest(path string) ([]byte, error) {
 		Path:   path,
 	}
 
-	req, err := http.NewRequest("GET", apiURL.String(), nil)
+	req, err := http.NewRequest("GET", fmt.Sprintf("%s?%s", apiURL.String(), params), nil)
 	if err != nil {
 		return []byte{}, err
 	}
 
 	req.Header.Set("Authorization", "Bearer "+d.token)
-
-	log.Warnf("url: %s, Got token: '%s' host: %s, port: %d", apiURL.String(), d.token, d.KubeHost, d.KubePort)
 
 	resp, err := d.client.Do(req)
 	if err != nil {
@@ -300,14 +298,14 @@ func (d *KubeAPIDiscoveryCommand) makeRequest(path string) ([]byte, error) {
 }
 
 func (d *KubeAPIDiscoveryCommand) GetServices() ([]byte, error) {
-	return d.makeRequest("/api/v1/services/")
+	return d.makeRequest("/api/v1/services/", "")
 }
 
 func (d *KubeAPIDiscoveryCommand) GetNodes() ([]byte, error) {
-	return d.makeRequest("/api/v1/nodes/")
+	return d.makeRequest("/api/v1/nodes/", "")
 }
 
 func (d *KubeAPIDiscoveryCommand) GetPods() ([]byte, error) {
-	return d.makeRequest("/api/v1/namespaces/" + d.Namespace + "/pods?limit=10000")
+	return d.makeRequest("/api/v1/namespaces/"+d.Namespace+"/pods", "limit=10000")
 
 }
