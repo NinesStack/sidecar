@@ -279,6 +279,8 @@ func (d *KubeAPIDiscoveryCommand) makeRequest(path string) ([]byte, error) {
 
 	req.Header.Set("Authorization", "Bearer "+d.token)
 
+	log.Warnf("Got token: '%s' host: %s, port: %d", d.token, d.KubeHost, d.KubePort)
+
 	resp, err := d.client.Do(req)
 	if err != nil {
 		return []byte{}, fmt.Errorf("failed to fetch from K8s API '%s': %w", path, err)
