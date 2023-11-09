@@ -124,6 +124,7 @@ type K8sPod struct {
 			App         string `json:"app"`
 			Release     string `json:"Release"`
 		} `json:"labels"`
+		UID             string `json:"uid"`
 	} `json:"metadata"`
 	Spec struct {
 		Containers []struct {
