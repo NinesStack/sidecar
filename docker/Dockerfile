@@ -14,4 +14,4 @@ ADD ui /sidecar/ui
 
 EXPOSE 7777
 
-CMD ["/bin/s6-svscan", "/etc/services"]
+CMD ["/bin/s6-svscan", "/etc/s6"]
