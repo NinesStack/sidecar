@@ -66,7 +66,7 @@ func (k *K8sAPIDiscoverer) servicesForNode(hostname, ip string) []service.Servic
 			}
 
 			svc := service.Service{
-				ID:        "kubernetes-hosted",
+				ID:        pod.Metadata.UID,
 				Name:      svcName,
 				Image:     pod.Image(),
 				Created:   pod.Metadata.CreationTimestamp,
