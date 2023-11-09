@@ -142,7 +142,7 @@ func configureDiscovery(config *config.Config, publishedIP string, localNode *me
 				discovery.NewK8sAPIDiscoverer(
 					config.K8sAPIDiscovery.KubeAPIIP, config.K8sAPIDiscovery.KubeAPIPort,
 					config.K8sAPIDiscovery.Namespace, config.K8sAPIDiscovery.KubeTimeout,
-					config.K8sAPIDiscovery.CredsPath, config.K8sAPIDiscovery.AnnounceAllNodes,
+					config.K8sAPIDiscovery.CredsPath,
 					localNode.Name,
 				),
 			)
