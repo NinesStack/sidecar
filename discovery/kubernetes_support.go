@@ -7,7 +7,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
-	"strings"
 	"time"
 
 	cleanhttp "github.com/hashicorp/go-cleanhttp"
@@ -230,6 +229,7 @@ func NewKubeAPIDiscoveryCommand(kubeHost string, kubePort int, namespace string,
 
 	// New line is illegal in tokens
 	//d.token = strings.Replace(string(data), "\n", "", -1)
+	d.token = string(data)
 
 	// Set up the timeout on a clean HTTP client
 	d.client = cleanhttp.DefaultClient()
