@@ -279,7 +279,7 @@ func (d *KubeAPIDiscoveryCommand) makeRequest(path string) ([]byte, error) {
 
 	req.Header.Set("Authorization", "Bearer "+d.token)
 
-	log.Warnf("Got token: '%s' host: %s, port: %d", d.token, d.KubeHost, d.KubePort)
+	log.Warnf("url: %s, Got token: '%s' host: %s, port: %d", apiURL.String(), d.token, d.KubeHost, d.KubePort)
 
 	resp, err := d.client.Do(req)
 	if err != nil {
