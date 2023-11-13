@@ -103,8 +103,8 @@ func (k *K8sAPIDiscoverer) serviceFromPod(svcName, ip string, pod K8sPod) servic
 }
 
 // Services implements part of the Discoverer interface and looks at the last
-// cached data from the Command (`kubectl`) and returns services in a format
-// that Sidecar can manage.
+// cached data from the Command and returns services in a format that Sidecar
+// can manage.
 func (k *K8sAPIDiscoverer) Services() []service.Service {
 	k.lock.RLock()
 	defer k.lock.RUnlock()
@@ -209,7 +209,9 @@ func (k *K8sAPIDiscoverer) getServices() ([]byte, error) {
 	}
 
 	k.lock.Lock()
-	for _, svc := range svcs.Items {
+	for _, s := range svcs.Items {
+		// Avoid Go loop var pointer re-use
+		svc := s
 		k.discoveredSvcs[svc.ServiceName()] = &svc
 	}
 	k.lock.Unlock()

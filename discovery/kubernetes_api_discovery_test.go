@@ -493,6 +493,8 @@ func Test_K8sServices(t *testing.T) {
 				So(svc.Updated.Unix(), ShouldBeGreaterThan, time.Now().UTC().Add(-2*time.Second).Unix())
 				So(len(svc.Ports), ShouldEqual, 1)
 				So(svc.Ports[0].IP, ShouldEqual, "10.100.69.147")
+				So(svc.Ports[0].Port, ShouldEqual, 38089)
+				So(svc.Ports[0].ServicePort, ShouldEqual, 10009)
 
 				svc = services[1]
 				// ID is the Pod UID
@@ -506,6 +508,8 @@ func Test_K8sServices(t *testing.T) {
 				So(svc.Updated.Unix(), ShouldBeGreaterThan, time.Now().UTC().Add(-2*time.Second).Unix())
 				So(len(svc.Ports), ShouldEqual, 1)
 				So(svc.Ports[0].IP, ShouldEqual, "10.100.69.147")
+				So(svc.Ports[0].ServicePort, ShouldEqual, 10007)
+				So(svc.Ports[0].Port, ShouldEqual, 38088)
 
 			})
 		})
