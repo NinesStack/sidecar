@@ -68,6 +68,32 @@ func (m *mockK8sDiscoveryCommand) GetServices() ([]byte, error) {
 	               }
 	            ]
 	         }
+	      },
+	      {
+	         "metadata" : {
+	            "creationTimestamp" : "2022-11-07T13:18:03Z",
+	            "labels" : {
+	               "Environment" : "dev",
+	               "ServiceName" : "arthur"
+	            },
+	            "name" : "chopper",
+	            "uid" : "abbacafe-9640-4fd0-b5de-1e898e8ae9f7"
+	         },
+	         "spec" : {
+	            "ports" : [
+	               {
+	                  "port" : 10009,
+	                  "protocol" : "TCP",
+	                  "targetPort" : 8089,
+					  "nodePort": 38089
+	               },
+	               {
+	                  "port" : 10010,
+	                  "protocol" : "TCP",
+	                  "targetPort" : 8089
+	               }
+	            ]
+	         }
 	      }
 	   ]
 	}
@@ -147,6 +173,82 @@ func (m *mockK8sDiscoveryCommand) GetPods() ([]byte, error) {
 		{
 		   "apiVersion" : "v1",
 		   "items" : [
+		      {
+		         "metadata" : {
+	                "creationTimestamp" : "2022-11-07T13:18:03Z",
+		            "labels" : {
+		               "Environment" : "dev",
+		               "ServiceName" : "arthur"
+		            },
+		            "name" : "chopper-64fd6dcf8c-9dd66",
+		            "namespace" : "default",
+		            "resourceVersion" : "24191869",
+		            "uid" : "abbacafe-8f85-4ab2-aae7-ace5b62797dc"
+		         },
+		         "spec" : {
+		            "containers" : [
+		               {
+		                  "env" : [
+		                     {
+		                        "name" : "PORT",
+		                        "value" : "5000"
+		                     }
+		                  ],
+		                  "image" : "somewhere/arthur:54e623d",
+		                  "livenessProbe" : {
+		                     "failureThreshold" : 3,
+		                     "httpGet" : {
+		                        "path" : "/health-check",
+		                        "port" : 5000,
+		                        "scheme" : "HTTP"
+		                     },
+		                     "periodSeconds" : 10,
+		                     "successThreshold" : 1,
+		                     "timeoutSeconds" : 1
+		                  },
+		                  "name" : "chopper",
+		                  "ports" : [
+		                     {
+		                        "containerPort" : 5000,
+		                        "name" : "port-0",
+		                        "protocol" : "TCP"
+		                     }
+		                  ],
+		                  "readinessProbe" : {
+		                     "failureThreshold" : 3,
+		                     "httpGet" : {
+		                        "path" : "/health-check",
+		                        "port" : 5000,
+		                        "scheme" : "HTTP"
+		                     },
+		                     "initialDelaySeconds" : 3,
+		                     "periodSeconds" : 3,
+		                     "successThreshold" : 1,
+		                     "timeoutSeconds" : 1
+		                  }
+		               }
+		            ],
+		            "dnsPolicy" : "ClusterFirst",
+		            "nodeName" : "heorot.example.com",
+		            "nodeSelector" : {
+		               "Role" : "eks-default-node-group"
+		            },
+		            "restartPolicy" : "Always",
+		            "serviceAccount" : "default",
+		            "serviceAccountName" : "default",
+		            "terminationGracePeriodSeconds" : 30
+		         },
+		         "status" : {
+		            "hostIP" : "10.0.58.178",
+		            "podIP" : "10.0.53.12",
+		            "podIPs" : [
+		               {
+		                  "ip" : "10.0.53.12"
+		               }
+		            ],
+		            "startTime" : "2023-06-23T15:58:21Z"
+		         }
+		      },
 		      {
 		         "metadata" : {
 	                "creationTimestamp" : "2022-11-07T13:18:03Z",
@@ -285,7 +387,7 @@ func Test_K8sGetServices(t *testing.T) {
 			So(capture.String(), ShouldNotContainSubstring, "error")
 			So(disco.discoveredSvcs, ShouldNotBeNil)
 			So(disco.discoveredSvcs, ShouldNotEqual, &K8sServices{})
-			So(len(disco.discoveredSvcs), ShouldEqual, 1)
+			So(len(disco.discoveredSvcs), ShouldEqual, 2)
 			// Cheating, there is only one, but this gets it
 			for _, svc := range disco.discoveredSvcs {
 				So(len(svc.Spec.Ports), ShouldEqual, 2)
@@ -370,15 +472,29 @@ func Test_K8sServices(t *testing.T) {
 		})
 
 		Convey("when discovering for a node where services are running", func() {
-			Convey("one service is discovered", func() {
+			Convey("two services are discovered", func() {
 				disco := NewK8sAPIDiscoverer("127.0.0.1", 443, "heorot", 3*time.Second, credsPath, "heorot.example.com")
 				disco.Command = mock
 
 				disco.Run(director.NewFreeLooper(director.ONCE, nil))
 				services := disco.Services()
 
-				So(len(services), ShouldEqual, 1)
+				So(len(services), ShouldEqual, 2)
+
 				svc := services[0]
+				// ID is the Pod UID
+				So(svc.ID, ShouldEqual, "abbacafe-8f85-4ab2-aae7-ace5b62797dc")
+				So(svc.Name, ShouldEqual, "arthur")
+				So(svc.Image, ShouldEqual, "somewhere/arthur:54e623d")
+				So(svc.Created.String(), ShouldEqual, "2022-11-07 13:18:03 +0000 UTC")
+				So(svc.Hostname, ShouldEqual, "heorot.example.com")
+				So(svc.ProxyMode, ShouldEqual, "http")
+				So(svc.Status, ShouldEqual, service.ALIVE)
+				So(svc.Updated.Unix(), ShouldBeGreaterThan, time.Now().UTC().Add(-2*time.Second).Unix())
+				So(len(svc.Ports), ShouldEqual, 1)
+				So(svc.Ports[0].IP, ShouldEqual, "10.100.69.147")
+
+				svc = services[1]
 				// ID is the Pod UID
 				So(svc.ID, ShouldEqual, "a9fb2fd7-8f85-4ab2-aae7-ace5b62797dc")
 				So(svc.Name, ShouldEqual, "chopper")
@@ -390,6 +506,7 @@ func Test_K8sServices(t *testing.T) {
 				So(svc.Updated.Unix(), ShouldBeGreaterThan, time.Now().UTC().Add(-2*time.Second).Unix())
 				So(len(svc.Ports), ShouldEqual, 1)
 				So(svc.Ports[0].IP, ShouldEqual, "10.100.69.147")
+
 			})
 		})
 
@@ -424,7 +541,7 @@ func Test_K8sGetPods(t *testing.T) {
 			So(capture.String(), ShouldNotContainSubstring, "error")
 			So(disco.discoveredPods, ShouldNotBeNil)
 			So(disco.discoveredPods, ShouldNotEqual, &K8sPods{})
-			So(len(disco.discoveredPods), ShouldEqual, 1)
+			So(len(disco.discoveredPods), ShouldEqual, 2)
 
 			pods := disco.discoveredPods["chopper"]
 			So(pods, ShouldNotBeEmpty)

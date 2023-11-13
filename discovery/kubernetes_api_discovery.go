@@ -19,11 +19,11 @@ type K8sAPIDiscoverer struct {
 
 	Command K8sDiscoveryAdapter
 
-	discoveredSvcs   map[string]*K8sService
-	discoveredNodes  *K8sNodes
-	discoveredPods   map[string][]*K8sPod
-	lock             sync.RWMutex
-	hostname         string
+	discoveredSvcs  map[string]*K8sService
+	discoveredNodes *K8sNodes
+	discoveredPods  map[string][]*K8sPod
+	lock            sync.RWMutex
+	hostname        string
 }
 
 // NewK8sAPIDiscoverer returns a properly configured K8sAPIDiscoverer
@@ -33,12 +33,12 @@ func NewK8sAPIDiscoverer(kubeHost string, kubePort int, namespace string, timeou
 	cmd := NewKubeAPIDiscoveryCommand(kubeHost, kubePort, namespace, timeout, credsPath)
 
 	return &K8sAPIDiscoverer{
-		discoveredSvcs:   make(map[string]*K8sService),
-		discoveredPods:   make(map[string][]*K8sPod),
-		discoveredNodes:  &K8sNodes{},
-		Namespace:        namespace,
-		Command:          cmd,
-		hostname:         hostname,
+		discoveredSvcs:  make(map[string]*K8sService),
+		discoveredPods:  make(map[string][]*K8sPod),
+		discoveredNodes: &K8sNodes{},
+		Namespace:       namespace,
+		Command:         cmd,
+		hostname:        hostname,
 	}
 }
 
@@ -65,34 +65,41 @@ func (k *K8sAPIDiscoverer) servicesForNode(hostname, ip string) []service.Servic
 				continue
 			}
 
-			svc := service.Service{
-				ID:        pod.Metadata.UID,
-				Name:      svcName,
-				Image:     pod.Image(),
-				Created:   pod.Metadata.CreationTimestamp,
-				Hostname:  pod.Spec.NodeName,
-				ProxyMode: "http",
-				Status:    service.ALIVE,
-				Updated:   time.Now().UTC(),
-			}
+			svc := k.serviceFromPod(svcName, ip, *pod)
 
-			for _, port := range k.discoveredSvcs[pod.ServiceName()].Spec.Ports {
-				// We only support entries with NodePort defined
-				if port.NodePort < 1 {
-					continue
-				}
-				svc.Ports = append(svc.Ports, service.Port{
-					Type:        "tcp",
-					Port:        int64(port.NodePort),
-					ServicePort: int64(port.Port),
-					IP:          ip,
-				})
-			}
 			services = append(services, svc)
 		}
 	}
 
 	return services
+}
+
+// serviceFromPod returns a Sidecar service for a K8sPod
+func (k *K8sAPIDiscoverer) serviceFromPod(svcName, ip string, pod K8sPod) service.Service {
+	svc := service.Service{
+		ID:        pod.Metadata.UID,
+		Name:      svcName,
+		Image:     pod.Image(),
+		Created:   pod.Metadata.CreationTimestamp,
+		Hostname:  pod.Spec.NodeName,
+		ProxyMode: "http",
+		Status:    service.ALIVE,
+		Updated:   time.Now().UTC(),
+	}
+
+	for _, port := range k.discoveredSvcs[pod.ServiceName()].Spec.Ports {
+		// We only support entries with NodePort defined
+		if port.NodePort < 1 {
+			continue
+		}
+		svc.Ports = append(svc.Ports, service.Port{
+			Type:        "tcp",
+			Port:        int64(port.NodePort),
+			ServicePort: int64(port.Port),
+			IP:          ip,
+		})
+	}
+	return svc
 }
 
 // Services implements part of the Discoverer interface and looks at the last
@@ -236,7 +243,9 @@ func (k *K8sAPIDiscoverer) getPods() ([]byte, error) {
 
 	k.lock.Lock()
 	for _, pod := range pods.Items {
-		k.discoveredPods[pod.ServiceName()] = append(k.discoveredPods[pod.ServiceName()], &pod)
+		// Avoid Go for loop pointer gotcha (will be fixed in Go 1.22)
+		thisPod := pod
+		k.discoveredPods[pod.ServiceName()] = append(k.discoveredPods[pod.ServiceName()], &thisPod)
 	}
 	k.lock.Unlock()
 	return data, err
