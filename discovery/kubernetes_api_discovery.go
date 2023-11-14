@@ -10,6 +10,8 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+var DefaultK8sLoopInterval = 5 * time.Second
+
 // A K8sAPIDiscoverer is a discovery mechanism that assumes that a K8s cluster
 // with be fronted by a load balancer and that all the ports exposed will match
 // up on both the load balancer and the backing pods. It relies on an underlying
@@ -24,6 +26,7 @@ type K8sAPIDiscoverer struct {
 	discoveredPods  map[string][]*K8sPod
 	lock            sync.RWMutex
 	hostname        string
+	loopInterval    time.Duration
 }
 
 // NewK8sAPIDiscoverer returns a properly configured K8sAPIDiscoverer
@@ -39,6 +42,7 @@ func NewK8sAPIDiscoverer(kubeHost string, kubePort int, namespace string, timeou
 		Namespace:       namespace,
 		Command:         cmd,
 		hostname:        hostname,
+		loopInterval:    DefaultK8sLoopInterval,
 	}
 }
 
@@ -191,6 +195,12 @@ func (k *K8sAPIDiscoverer) Run(looper director.Looper) {
 			if err != nil {
 				log.Errorf("Failed to unmarshal pods json: %s, %s", err, string(data))
 			}
+			wg.Done()
+		}()
+
+		wg.Add(1)
+		go func() {
+			time.Sleep(k.loopInterval)
 			wg.Done()
 		}()
 
