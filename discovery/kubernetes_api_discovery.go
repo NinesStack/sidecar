@@ -87,17 +87,21 @@ func (k *K8sAPIDiscoverer) serviceFromPod(svcName, ip string, pod K8sPod) servic
 		Updated:   time.Now().UTC(),
 	}
 
-	for _, port := range k.discoveredSvcs[pod.ServiceName()].Spec.Ports {
-		// We only support entries with NodePort defined
-		if port.NodePort < 1 {
-			continue
+	if discovered, ok := k.discoveredSvcs[pod.ServiceName()]; ok {
+		if discovered.Spec.Ports != nil {
+			for _, port := range discovered.Spec.Ports {
+				// We only support entries with NodePort defined
+				if port.NodePort < 1 {
+					continue
+				}
+				svc.Ports = append(svc.Ports, service.Port{
+					Type:        "tcp",
+					Port:        int64(port.NodePort),
+					ServicePort: int64(port.Port),
+					IP:          ip,
+				})
+			}
 		}
-		svc.Ports = append(svc.Ports, service.Port{
-			Type:        "tcp",
-			Port:        int64(port.NodePort),
-			ServicePort: int64(port.Port),
-			IP:          ip,
-		})
 	}
 	return svc
 }
