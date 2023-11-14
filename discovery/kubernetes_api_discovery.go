@@ -253,11 +253,18 @@ func (k *K8sAPIDiscoverer) getPods() ([]byte, error) {
 		thisPod := pod
 
 		// We only care about things with a ServiceName defined
-		if len(pod.ServiceName()) > 0 {
-			k.discoveredPods[pod.ServiceName()] = append(k.discoveredPods[pod.ServiceName()], &thisPod)
-		} else {
+		if len(pod.ServiceName()) < 1 {
 			log.Debugf("Skipping pod %s: missing ServiceName label", pod.Metadata.UID)
+			continue
 		}
+
+		// Enables explicit skipping of some services via a Label
+		if pod.Metadata.Labels.SidecarDiscover == "false" {
+			continue
+		}
+
+		k.discoveredPods[pod.ServiceName()] = append(k.discoveredPods[pod.ServiceName()], &thisPod)
+
 	}
 	k.lock.Unlock()
 	return data, err

@@ -332,6 +332,16 @@ func (m *mockK8sDiscoveryCommand) GetPods() ([]byte, error) {
 					},
 		            "uid" : "deadbeef-8f85-4ab2-aae7-ace5b62797dc"
 		         }
+		      },
+		      {
+		         "metadata" : {
+		            "labels" : {
+						"ServiceName": "grendel",
+						"IntentionallyBroken": "yes",
+						"SidecarDiscover": "false"
+					},
+		            "uid" : "feedbeef-8f85-4ab2-aae7-ace5b62797dc"
+		         }
 		      }
 		   ],
 		   "kind" : "PodList",

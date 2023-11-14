@@ -119,12 +119,13 @@ type K8sPod struct {
 		Namespace         string    `json:"namespace"`
 		CreationTimestamp time.Time `json:"creationTimestamp"`
 		Labels            struct {
-			Environment string `json:"Environment"`
-			ServiceName string `json:"ServiceName"`
-			App         string `json:"app"`
-			Release     string `json:"Release"`
+			Environment     string `json:"Environment"`
+			ServiceName     string `json:"ServiceName"`
+			App             string `json:"app"`
+			Release         string `json:"Release"`
+			SidecarDiscover string `json:"SidecarDiscover"`
 		} `json:"labels"`
-		UID             string `json:"uid"`
+		UID string `json:"uid"`
 	} `json:"metadata"`
 	Spec struct {
 		Containers []struct {
