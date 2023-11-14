@@ -372,8 +372,8 @@ func main() {
 	}
 
 	// This is kind of expensive because it looks at the state and formats text
-	// output on an ongoing basis. Only run in debug mode.
-	if config.Sidecar.Debug {
+	// output on an ongoing basis. Only run in debug logging mode.
+	if config.Sidecar.LoggingLevel == "debug" {
 		go announceMembers(list, state)
 	}
 
