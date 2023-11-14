@@ -10,6 +10,8 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+var DefaultK8sLoopInterval = 5 * time.Second
+
 // A K8sAPIDiscoverer is a discovery mechanism that assumes that a K8s cluster
 // with be fronted by a load balancer and that all the ports exposed will match
 // up on both the load balancer and the backing pods. It relies on an underlying
@@ -24,6 +26,7 @@ type K8sAPIDiscoverer struct {
 	discoveredPods  map[string][]*K8sPod
 	lock            sync.RWMutex
 	hostname        string
+	loopInterval    time.Duration
 }
 
 // NewK8sAPIDiscoverer returns a properly configured K8sAPIDiscoverer
@@ -39,6 +42,7 @@ func NewK8sAPIDiscoverer(kubeHost string, kubePort int, namespace string, timeou
 		Namespace:       namespace,
 		Command:         cmd,
 		hostname:        hostname,
+		loopInterval:    DefaultK8sLoopInterval,
 	}
 }
 
@@ -87,17 +91,21 @@ func (k *K8sAPIDiscoverer) serviceFromPod(svcName, ip string, pod K8sPod) servic
 		Updated:   time.Now().UTC(),
 	}
 
-	for _, port := range k.discoveredSvcs[pod.ServiceName()].Spec.Ports {
-		// We only support entries with NodePort defined
-		if port.NodePort < 1 {
-			continue
+	if discovered, ok := k.discoveredSvcs[pod.ServiceName()]; ok {
+		if discovered.Spec.Ports != nil {
+			for _, port := range discovered.Spec.Ports {
+				// We only support entries with NodePort defined
+				if port.NodePort < 1 {
+					continue
+				}
+				svc.Ports = append(svc.Ports, service.Port{
+					Type:        "tcp",
+					Port:        int64(port.NodePort),
+					ServicePort: int64(port.Port),
+					IP:          ip,
+				})
+			}
 		}
-		svc.Ports = append(svc.Ports, service.Port{
-			Type:        "tcp",
-			Port:        int64(port.NodePort),
-			ServicePort: int64(port.Port),
-			IP:          ip,
-		})
 	}
 	return svc
 }
@@ -190,6 +198,12 @@ func (k *K8sAPIDiscoverer) Run(looper director.Looper) {
 			wg.Done()
 		}()
 
+		wg.Add(1)
+		go func() {
+			time.Sleep(k.loopInterval)
+			wg.Done()
+		}()
+
 		wg.Wait()
 		return nil
 	})
@@ -247,7 +261,20 @@ func (k *K8sAPIDiscoverer) getPods() ([]byte, error) {
 	for _, pod := range pods.Items {
 		// Avoid Go for loop pointer gotcha (will be fixed in Go 1.22)
 		thisPod := pod
+
+		// We only care about things with a ServiceName defined
+		if len(pod.ServiceName()) < 1 {
+			log.Debugf("Skipping pod %s: missing ServiceName label", pod.Metadata.UID)
+			continue
+		}
+
+		// Enables explicit skipping of some services via a Label
+		if pod.Metadata.Labels.SidecarDiscover == "false" {
+			continue
+		}
+
 		k.discoveredPods[pod.ServiceName()] = append(k.discoveredPods[pod.ServiceName()], &thisPod)
+
 	}
 	k.lock.Unlock()
 	return data, err
