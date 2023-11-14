@@ -563,8 +563,10 @@ func Test_K8sGetPods(t *testing.T) {
 
 		Convey("skips pods that are missing ServiceName", func() {
 			log.SetOutput(capture)
+			log.SetLevel(log.DebugLevel)
 			disco.Run(director.NewFreeLooper(director.ONCE, nil))
 			log.SetOutput(os.Stdout)
+			log.SetLevel(log.InfoLevel)
 
 			So(capture.String(), ShouldContainSubstring, "Skipping pod deadbeef")
 		})
