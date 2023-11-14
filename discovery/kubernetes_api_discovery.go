@@ -56,16 +56,16 @@ func (k *K8sAPIDiscoverer) servicesForNode(hostname, ip string) []service.Servic
 		for _, pod := range podList {
 			// We require an annotation called 'ServiceName' to make sure this is
 			// a service we want to announce.
-			if pod.ServiceName() == "" {
-				continue
-			}
-
-			if pod.Spec.NodeName != hostname {
+			if len(pod.ServiceName()) < 1 {
 				continue
 			}
 
 			// If we don't have a service from K8s, then there are no ports to expose
 			if k.discoveredPods[pod.ServiceName()] == nil {
+				continue
+			}
+
+			if pod.Spec.NodeName != hostname {
 				continue
 			}
 
@@ -222,13 +222,18 @@ func (k *K8sAPIDiscoverer) getServices() ([]byte, error) {
 		return data, err
 	}
 
-	k.lock.Lock()
+	discoveredSvcs := make(map[string]*K8sService)
+
 	for _, s := range svcs.Items {
 		// Avoid Go loop var pointer re-use
 		svc := s
-		k.discoveredSvcs[svc.ServiceName()] = &svc
+		discoveredSvcs[svc.ServiceName()] = &svc
 	}
+
+	k.lock.Lock()
+	k.discoveredSvcs = discoveredSvcs
 	k.lock.Unlock()
+
 	return data, err
 }
 
@@ -257,7 +262,8 @@ func (k *K8sAPIDiscoverer) getPods() ([]byte, error) {
 		return data, err
 	}
 
-	k.lock.Lock()
+	discoveredPods := make(map[string][]*K8sPod)
+
 	for _, pod := range pods.Items {
 		// Avoid Go for loop pointer gotcha (will be fixed in Go 1.22)
 		thisPod := pod
@@ -273,9 +279,12 @@ func (k *K8sAPIDiscoverer) getPods() ([]byte, error) {
 			continue
 		}
 
-		k.discoveredPods[pod.ServiceName()] = append(k.discoveredPods[pod.ServiceName()], &thisPod)
+		discoveredPods[pod.ServiceName()] = append(discoveredPods[pod.ServiceName()], &thisPod)
 
 	}
+
+	k.lock.Lock()
+	k.discoveredPods = discoveredPods
 	k.lock.Unlock()
 	return data, err
 }
