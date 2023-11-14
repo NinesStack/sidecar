@@ -247,7 +247,13 @@ func (k *K8sAPIDiscoverer) getPods() ([]byte, error) {
 	for _, pod := range pods.Items {
 		// Avoid Go for loop pointer gotcha (will be fixed in Go 1.22)
 		thisPod := pod
-		k.discoveredPods[pod.ServiceName()] = append(k.discoveredPods[pod.ServiceName()], &thisPod)
+
+		// We only care about things with a ServiceName defined
+		if len(pod.ServiceName()) > 0 {
+			k.discoveredPods[pod.ServiceName()] = append(k.discoveredPods[pod.ServiceName()], &thisPod)
+		} else {
+			log.Infof("Skipping pod %s: missing ServiceName label", pod.Metadata.UID)
+		}
 	}
 	k.lock.Unlock()
 	return data, err

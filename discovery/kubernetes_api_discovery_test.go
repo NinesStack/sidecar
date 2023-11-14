@@ -324,6 +324,14 @@ func (m *mockK8sDiscoveryCommand) GetPods() ([]byte, error) {
 		            ],
 		            "startTime" : "2023-06-23T14:58:21Z"
 		         }
+		      },
+		      {
+		         "metadata" : {
+		            "labels" : {
+						"IntentionallyBroken": "yes"
+					},
+		            "uid" : "deadbeef-8f85-4ab2-aae7-ace5b62797dc"
+		         }
 		      }
 		   ],
 		   "kind" : "PodList",
@@ -551,6 +559,14 @@ func Test_K8sGetPods(t *testing.T) {
 			So(pods, ShouldNotBeEmpty)
 			pod := pods[0]
 			So(pod.ServiceName(), ShouldEqual, "chopper")
+		})
+
+		Convey("skips pods that are missing ServiceName", func() {
+			log.SetOutput(capture)
+			disco.Run(director.NewFreeLooper(director.ONCE, nil))
+			log.SetOutput(os.Stdout)
+
+			So(capture.String(), ShouldContainSubstring, "Skipping pod deadbeef")
 		})
 
 		Convey("call the command and logs errors", func() {
