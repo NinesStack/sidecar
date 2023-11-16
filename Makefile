@@ -26,7 +26,7 @@ code-check:
 build: #: Build the app locally
 build: clean 
 	GOOS=linux $(GO) build $(GO_BUILD_FLAGS) -o $(APP_NAME)
-	./docker/build.sh
+	cd docker && build.sh
 
 .PHONY: release
 release: #: Build and upload the release to GitHub
