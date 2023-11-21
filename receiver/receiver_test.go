@@ -4,9 +4,9 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/NinesStack/sidecar/catalog"
 	. "github.com/smartystreets/goconvey/convey"
 	"gopkg.in/jarcoal/httpmock.v1"
-	"github.com/NinesStack/sidecar/catalog"
 )
 
 func Test_FetchState(t *testing.T) {

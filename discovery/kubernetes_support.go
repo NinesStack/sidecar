@@ -124,6 +124,7 @@ type K8sPod struct {
 			App             string `json:"app"`
 			Release         string `json:"Release"`
 			SidecarDiscover string `json:"SidecarDiscover"`
+			ProxyMode       string `json:"ProxyMode"`
 		} `json:"labels"`
 		UID string `json:"uid"`
 	} `json:"metadata"`

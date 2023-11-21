@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"os"
+	"sort"
 	"testing"
 	"time"
 
@@ -254,7 +255,8 @@ func (m *mockK8sDiscoveryCommand) GetPods() ([]byte, error) {
 	                "creationTimestamp" : "2022-11-07T13:18:03Z",
 		            "labels" : {
 		               "Environment" : "dev",
-		               "ServiceName" : "chopper"
+		               "ServiceName" : "chopper",
+                       "ProxyMode"   : "tcp"
 		            },
 		            "name" : "chopper-64fd6dcf8c-9dd66",
 		            "namespace" : "default",
@@ -503,32 +505,18 @@ func Test_K8sServices(t *testing.T) {
 
 				disco.Run(director.NewFreeLooper(director.ONCE, nil))
 				services := disco.Services()
+				// Sort for stable lists
+				sort.Sort(service.ByID(services))
 
 				So(len(services), ShouldEqual, 2)
 
 				svc := services[0]
-				// ID is the Pod UID
-				So(svc.ID, ShouldEqual, "abbacafe-8f85-4ab2-aae7-ace5b62797dc")
-				So(svc.Name, ShouldEqual, "arthur")
-				So(svc.Image, ShouldEqual, "somewhere/arthur:54e623d")
-				So(svc.Created.String(), ShouldEqual, "2022-11-07 13:18:03 +0000 UTC")
-				So(svc.Hostname, ShouldEqual, "heorot.example.com")
-				So(svc.ProxyMode, ShouldEqual, "http")
-				So(svc.Status, ShouldEqual, service.ALIVE)
-				So(svc.Updated.Unix(), ShouldBeGreaterThan, time.Now().UTC().Add(-2*time.Second).Unix())
-				So(len(svc.Ports), ShouldEqual, 1)
-				So(svc.Ports[0].IP, ShouldEqual, "10.100.69.147")
-				So(svc.Ports[0].Port, ShouldEqual, 38089)
-				So(svc.Ports[0].ServicePort, ShouldEqual, 10009)
-
-				svc = services[1]
 				// ID is the Pod UID
 				So(svc.ID, ShouldEqual, "a9fb2fd7-8f85-4ab2-aae7-ace5b62797dc")
 				So(svc.Name, ShouldEqual, "chopper")
 				So(svc.Image, ShouldEqual, "somewhere/chopper:54e623d")
 				So(svc.Created.String(), ShouldEqual, "2022-11-07 13:18:03 +0000 UTC")
 				So(svc.Hostname, ShouldEqual, "heorot.example.com")
-				So(svc.ProxyMode, ShouldEqual, "http")
 				So(svc.Status, ShouldEqual, service.ALIVE)
 				So(svc.Updated.Unix(), ShouldBeGreaterThan, time.Now().UTC().Add(-2*time.Second).Unix())
 				So(len(svc.Ports), ShouldEqual, 1)
@@ -536,6 +524,39 @@ func Test_K8sServices(t *testing.T) {
 				So(svc.Ports[0].ServicePort, ShouldEqual, 10007)
 				So(svc.Ports[0].Port, ShouldEqual, 38088)
 
+				svc = services[1]
+				// ID is the Pod UID
+				So(svc.ID, ShouldEqual, "abbacafe-8f85-4ab2-aae7-ace5b62797dc")
+				So(svc.Name, ShouldEqual, "arthur")
+				So(svc.Image, ShouldEqual, "somewhere/arthur:54e623d")
+				So(svc.Created.String(), ShouldEqual, "2022-11-07 13:18:03 +0000 UTC")
+				So(svc.Hostname, ShouldEqual, "heorot.example.com")
+				So(svc.Status, ShouldEqual, service.ALIVE)
+				So(svc.Updated.Unix(), ShouldBeGreaterThan, time.Now().UTC().Add(-2*time.Second).Unix())
+				So(len(svc.Ports), ShouldEqual, 1)
+				So(svc.Ports[0].IP, ShouldEqual, "10.100.69.147")
+				So(svc.Ports[0].Port, ShouldEqual, 38089)
+				So(svc.Ports[0].ServicePort, ShouldEqual, 10009)
+
+			})
+
+			Convey("The ProxyMode label switches the proxy mode", func() {
+				disco := NewK8sAPIDiscoverer("127.0.0.1", 443, "heorot", 3*time.Second, credsPath, "heorot.example.com")
+				disco.loopInterval = time.Duration(0)
+				disco.Command = mock
+
+				disco.Run(director.NewFreeLooper(director.ONCE, nil))
+				services := disco.Services()
+				// Sort for stable lists
+				sort.Sort(service.ByID(services))
+
+				svc := services[0]
+				So(svc.ID, ShouldEqual, "a9fb2fd7-8f85-4ab2-aae7-ace5b62797dc")
+				So(svc.ProxyMode, ShouldEqual, "tcp")
+
+				svc = services[1]
+				So(svc.ID, ShouldEqual, "abbacafe-8f85-4ab2-aae7-ace5b62797dc")
+				So(svc.ProxyMode, ShouldEqual, "http")
 			})
 		})
 
