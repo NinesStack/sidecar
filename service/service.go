@@ -208,3 +208,9 @@ func buildPortFor(port *docker.APIPort, container *docker.APIContainers, ip stri
 
 	return returnPort
 }
+
+type ByID []Service
+
+func (a ByID) Len() int           { return len(a) }
+func (a ByID) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a ByID) Less(i, j int) bool { return strings.Compare(a[i].ID, a[j].ID) == -1 }

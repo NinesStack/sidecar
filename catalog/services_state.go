@@ -325,7 +325,6 @@ func (state *ServicesState) AddServiceEntry(newSvc service.Service) {
 			newSvc.Hostname, newSvc.Name, newSvc.ID,
 		)
 
-
 		// Do we somehow already have this stale thing in our state? We
 		// shouldn't. Let's clean it out if we somehow do. This seems to
 		// happen in very rare circumstances.

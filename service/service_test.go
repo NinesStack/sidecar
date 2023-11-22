@@ -143,7 +143,7 @@ func Test_IsStale(t *testing.T) {
 	Convey("IsStale()", t, func() {
 		Convey("identifies records that are too old to process", func() {
 			lifespan := 1 * time.Hour
-			lastUpdated := time.Now().UTC().Add(0-lifespan).Add(0-2 * time.Minute)
+			lastUpdated := time.Now().UTC().Add(0 - lifespan).Add(0 - 2*time.Minute)
 
 			svc := &Service{
 				Name:     "hrunting",
@@ -153,7 +153,7 @@ func Test_IsStale(t *testing.T) {
 
 			So(svc.IsStale(lifespan), ShouldBeTrue)
 
-			svc.Updated = time.Now().UTC().Add(0-lifespan)
+			svc.Updated = time.Now().UTC().Add(0 - lifespan)
 			So(svc.IsStale(62*time.Minute), ShouldBeFalse)
 		})
 	})

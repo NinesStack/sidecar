@@ -91,6 +91,11 @@ func (k *K8sAPIDiscoverer) serviceFromPod(svcName, ip string, pod K8sPod) servic
 		Updated:   time.Now().UTC(),
 	}
 
+	// It's possible to override the default with a ProxyMode label
+	if pod.Metadata.Labels.ProxyMode == "tcp" {
+		svc.ProxyMode = "tcp"
+	}
+
 	if discovered, ok := k.discoveredSvcs[pod.ServiceName()]; ok {
 		if discovered.Spec.Ports != nil {
 			for _, port := range discovered.Spec.Ports {

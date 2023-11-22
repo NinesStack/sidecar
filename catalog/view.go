@@ -33,7 +33,8 @@ func (state *ServicesState) EachLocalService(fn func(hostname *string, serviceId
 }
 
 // Services -------------------------------
-//   by Age
+//
+//	by Age
 type ServicesByAge []*service.Service
 
 func (s ServicesByAge) Len() int           { return len(s) }
@@ -52,7 +53,7 @@ func (s *Server) SortedServices() []*service.Service {
 	return servicesList
 }
 
-//   by Name
+// by Name
 type ServicesByName []*service.Service
 
 func (a ServicesByName) Len() int           { return len(a) }
@@ -87,7 +88,8 @@ func (state *ServicesState) SortedServers() []*Server {
 }
 
 // Memberlist --------------------------------
-//   by Name
+//
+//	by Name
 type ListByName []*memberlist.Node
 
 func (a ListByName) Len() int           { return len(a) }
