@@ -96,6 +96,10 @@ func (k *K8sAPIDiscoverer) serviceFromPod(svcName, ip string, pod K8sPod) servic
 		svc.ProxyMode = "tcp"
 	}
 
+	if pod.Metadata.Labels.ProxyMode == "ws" {
+		svc.ProxyMode = "ws"
+	}
+
 	if discovered, ok := k.discoveredSvcs[pod.ServiceName()]; ok {
 		if discovered.Spec.Ports != nil {
 			for _, port := range discovered.Spec.Ports {
