@@ -94,9 +94,7 @@ func (k *K8sAPIDiscoverer) serviceFromPod(svcName, ip string, pod K8sPod) servic
 	// It's possible to override the default with a ProxyMode label
 	if pod.Metadata.Labels.ProxyMode == "tcp" {
 		svc.ProxyMode = "tcp"
-	}
-
-	if pod.Metadata.Labels.ProxyMode == "ws" {
+	} else if pod.Metadata.Labels.ProxyMode == "ws" {
 		svc.ProxyMode = "ws"
 	}
 
