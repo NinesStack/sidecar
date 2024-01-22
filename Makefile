@@ -26,7 +26,7 @@ code-check:
 build: #: Build the app locally
 build: clean 
 	GOOS=linux $(GO) build $(GO_BUILD_FLAGS) -o $(APP_NAME)
-	cd docker && build.sh
+	cp sidecar docker && ./docker/build.sh
 
 .PHONY: release
 release: #: Build and upload the release to GitHub
@@ -36,6 +36,7 @@ release: #: Build and upload the release to GitHub
 clean: #: Clean up build artifacts
 clean:
 	$(RM) ./$(APP_NAME)
+	$(RM) ./docker/$(APP_NAME)
 
 ### Test
 
