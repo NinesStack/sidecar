@@ -36,7 +36,6 @@ release: #: Build and upload the release to GitHub
 clean: #: Clean up build artifacts
 clean:
 	$(RM) ./$(APP_NAME)
-	$(RM) ./docker/$(APP_NAME)
 
 ### Test
 
