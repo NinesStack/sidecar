@@ -86,16 +86,18 @@ func (k *K8sAPIDiscoverer) serviceFromPod(svcName, ip string, pod K8sPod) servic
 		Image:     pod.Image(),
 		Created:   pod.Metadata.CreationTimestamp,
 		Hostname:  pod.Spec.NodeName,
-		ProxyMode: "http",
 		Status:    service.ALIVE,
 		Updated:   time.Now().UTC(),
 	}
 
 	// It's possible to override the default with a ProxyMode label
-	if pod.Metadata.Labels.ProxyMode == "tcp" {
+	switch pod.Metadata.Labels.ProxyMode {
+	case "tcp":
 		svc.ProxyMode = "tcp"
-	} else if pod.Metadata.Labels.ProxyMode == "ws" {
+	case "ws":
 		svc.ProxyMode = "ws"
+	default:
+		svc.ProxyMode = "http"
 	}
 
 	if discovered, ok := k.discoveredSvcs[pod.ServiceName()]; ok {
