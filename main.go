@@ -91,7 +91,7 @@ func configureHAproxy(config *config.Config) *haproxy.HAproxy {
 	return proxy
 }
 
-func configureDiscovery(config *config.Config, publishedIP string) discovery.Discoverer {
+func configureDiscovery(config *config.Config, publishedIP string, localNode *memberlist.Node) discovery.Discoverer {
 	disco := new(discovery.MultiDiscovery)
 
 	var svcNamer discovery.ServiceNamer
@@ -135,6 +135,16 @@ func configureDiscovery(config *config.Config, publishedIP string) discovery.Dis
 			disco.Discoverers = append(
 				disco.Discoverers,
 				discovery.NewStaticDiscovery(config.StaticDiscovery.ConfigFile, publishedIP),
+			)
+		case "kubernetes_api":
+			disco.Discoverers = append(
+				disco.Discoverers,
+				discovery.NewK8sAPIDiscoverer(
+					config.K8sAPIDiscovery.KubeAPIIP, config.K8sAPIDiscovery.KubeAPIPort,
+					config.K8sAPIDiscovery.Namespace, config.K8sAPIDiscovery.KubeTimeout,
+					config.K8sAPIDiscovery.CredsPath,
+					localNode.Name,
+				),
 			)
 		default:
 		}
@@ -247,6 +257,8 @@ func configureMemberlist(config *config.Config, state *catalog.ServicesState) *m
 	if config.Sidecar.GossipMessages != 0 {
 		mlConfig.GossipMessages = config.Sidecar.GossipMessages
 	}
+	mlConfig.GossipInterval = config.Sidecar.GossipInterval
+	mlConfig.HandoffQueueDepth = config.Sidecar.HandoffQueueDepth
 
 	// Make sure we pass on the cluster name to Memberlist
 	mlConfig.ClusterName = config.Sidecar.ClusterName
@@ -297,8 +309,9 @@ func main() {
 	exitWithError(err, "Failed to create memberlist")
 
 	// Join an existing cluster by specifying at least one known member.
-	_, err = list.Join(config.Sidecar.Seeds)
+	nodeCount, err := list.Join(config.Sidecar.Seeds)
 	exitWithError(err, "Failed to join cluster")
+	log.Infof("Joined cluster with %d nodes contacted", nodeCount)
 
 	// Set up a bunch of go-director Loopers to run our
 	// background goroutines
@@ -312,7 +325,7 @@ func main() {
 		director.FOREVER, catalog.ALIVE_SLEEP_INTERVAL, nil,
 	)
 	discoLooper := director.NewTimedLooper(
-		director.FOREVER, discovery.DefaultSleepInterval, make(chan error),
+		director.FOREVER, config.Sidecar.DiscoverySleepInterval, make(chan error),
 	)
 	listenLooper := director.NewTimedLooper(
 		director.FOREVER, discovery.DefaultSleepInterval, make(chan error),
@@ -327,7 +340,7 @@ func main() {
 	// Register the cluster name with the state object
 	state.ClusterName = config.Sidecar.ClusterName
 
-	disco := configureDiscovery(config, mlConfig.AdvertiseAddr)
+	disco := configureDiscovery(config, mlConfig.AdvertiseAddr, list.LocalNode())
 	go disco.Run(discoLooper)
 
 	// Configure the monitor and use the public address as the default
@@ -358,7 +371,12 @@ func main() {
 		go proxy.Watch(state)
 	}
 
-	go announceMembers(list, state)
+	// This is kind of expensive because it looks at the state and formats text
+	// output on an ongoing basis. Only run in debug logging mode.
+	if config.Sidecar.LoggingLevel == "debug" {
+		go announceMembers(list, state)
+	}
+
 	go state.BroadcastServices(serviceFunc, servicesLooper)
 	go state.BroadcastTombstones(serviceFunc, tombstoneLooper)
 	go state.TrackNewServices(serviceFunc, trackingLooper)
