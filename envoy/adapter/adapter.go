@@ -14,6 +14,7 @@ import (
 	endpoint "github.com/envoyproxy/go-control-plane/envoy/config/endpoint/v3"
 	listener "github.com/envoyproxy/go-control-plane/envoy/config/listener/v3"
 	route "github.com/envoyproxy/go-control-plane/envoy/config/route/v3"
+	router "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/router/v3"
 	hcm "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/network/http_connection_manager/v3"
 	tcpp "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/network/tcp_proxy/v3"
 	cache_types "github.com/envoyproxy/go-control-plane/pkg/cache/types"
@@ -230,10 +231,12 @@ func connectionManagerForService(svc *service.Service, envoyServiceName string) 
 	case "http":
 		managerName = wellknown.HTTPConnectionManager
 
+		routerConfig, _ := anypb.New(&router.Router{})
 		manager = &hcm.HttpConnectionManager{
 			StatPrefix: "ingress_http",
 			HttpFilters: []*hcm.HttpFilter{{
 				Name: wellknown.Router,
+				ConfigType: &hcm.HttpFilter_TypedConfig{TypedConfig: routerConfig},
 			}},
 			RouteSpecifier: &hcm.HttpConnectionManager_RouteConfig{
 				RouteConfig: &route.RouteConfiguration{
