@@ -224,7 +224,8 @@ Defaults are in bold at the end of the line:
  * `ENVOY_USE_HOSTNAMES`: Should we write hostnames in the Envoy config instead
    of IP addresses? **`false`**
  * `ENVOY_GRPC_PORT`: The port for the Envoy API gRPC server **`7776`**
-
+ * `ENVOY_LOGGING_LEVEL`: The logging level to use (debug, info, warn, error)
+   **info**
 
  * `KUBE_API_IP`: The IP address at which to reach the Kubernetes API **`127.0.0.1`**
  * `KUBE_API_PORT`: The port to use to contact the Kubernetes API **`8080`**

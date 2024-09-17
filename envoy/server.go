@@ -10,10 +10,9 @@ import (
 	"github.com/NinesStack/sidecar/catalog"
 	"github.com/NinesStack/sidecar/config"
 	"github.com/NinesStack/sidecar/envoy/adapter"
-	api "github.com/envoyproxy/go-control-plane/envoy/api/v2"
-	envoy_discovery "github.com/envoyproxy/go-control-plane/envoy/service/discovery/v2"
-	"github.com/envoyproxy/go-control-plane/pkg/cache/v2"
-	xds "github.com/envoyproxy/go-control-plane/pkg/server/v2"
+	envoy_disco "github.com/envoyproxy/go-control-plane/envoy/service/discovery/v3"
+	"github.com/envoyproxy/go-control-plane/pkg/cache/v3"
+	xds "github.com/envoyproxy/go-control-plane/pkg/server/v3"
 	"github.com/relistan/go-director"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
@@ -26,10 +25,10 @@ const (
 
 type xdsCallbacks struct{}
 
-func (*xdsCallbacks) OnStreamOpen(context.Context, int64, string) error  { return nil }
-func (*xdsCallbacks) OnStreamClosed(int64)                               {}
-func (*xdsCallbacks) OnStreamRequest(int64, *api.DiscoveryRequest) error { return nil }
-func (*xdsCallbacks) OnStreamResponse(_ int64, req *api.DiscoveryRequest, _ *api.DiscoveryResponse) {
+func (*xdsCallbacks) OnStreamOpen(context.Context, int64, string) error          { return nil }
+func (*xdsCallbacks) OnStreamClosed(int64)                                       {}
+func (*xdsCallbacks) OnStreamRequest(int64, *envoy_disco.DiscoveryRequest) error { return nil }
+func (*xdsCallbacks) OnStreamResponse(ctx context.Context, _ int64, req *envoy_disco.DiscoveryRequest, _ *envoy_disco.DiscoveryResponse) {
 	if req.GetErrorDetail().GetCode() != 0 {
 		log.Errorf("Received Envoy error code %d: %s",
 			req.GetErrorDetail().GetCode(),
@@ -37,8 +36,18 @@ func (*xdsCallbacks) OnStreamResponse(_ int64, req *api.DiscoveryRequest, _ *api
 		)
 	}
 }
-func (*xdsCallbacks) OnFetchRequest(context.Context, *api.DiscoveryRequest) error   { return nil }
-func (*xdsCallbacks) OnFetchResponse(*api.DiscoveryRequest, *api.DiscoveryResponse) {}
+func (*xdsCallbacks) OnFetchRequest(context.Context, *envoy_disco.DiscoveryRequest) error           { return nil }
+func (*xdsCallbacks) OnFetchResponse(*envoy_disco.DiscoveryRequest, *envoy_disco.DiscoveryResponse) {}
+func (*xdsCallbacks) OnDeltaStreamOpen(ctx context.Context, streamID int64, typeURL string) error {
+	return nil
+}
+func (*xdsCallbacks) OnStreamDeltaRequest(streamID int64, req *envoy_disco.DeltaDiscoveryRequest) error {
+	return nil
+}
+func (*xdsCallbacks) OnStreamDeltaResponse(streamID int64,
+	req *envoy_disco.DeltaDiscoveryRequest, resp *envoy_disco.DeltaDiscoveryResponse) {
+}
+func (*xdsCallbacks) OnDeltaStreamClosed(streamID int64) {}
 
 // Server is a wrapper around Envoy's control plane xDS gRPC server and it uses
 // the Aggregated Discovery Service (ADS) mechanism.
@@ -89,14 +98,13 @@ func (s *Server) Run(ctx context.Context, looper director.Looper, grpcListener n
 
 		// Create a new snapshot version and send the listeners and clusters to Envoy
 		snapshotVersion := newSnapshotVersion()
-		err := s.snapshotCache.SetSnapshot(hostname, cache.NewSnapshot(
-			snapshotVersion,
-			resources.Endpoints,
-			resources.Clusters,
-			nil,
-			resources.Listeners,
-			nil,
-		))
+		snap, err := cache.NewSnapshot(snapshotVersion, resources.AsMap())
+		if err != nil {
+			log.Errorf("Failed to create new Envoy cache snapshot: %s", err)
+			return nil
+		}
+
+		err = s.snapshotCache.SetSnapshot(ctx, hostname, snap)
 		if err != nil {
 			log.Errorf("Failed to set new Envoy cache snapshot: %s", err)
 			return nil
@@ -110,7 +118,7 @@ func (s *Server) Run(ctx context.Context, looper director.Looper, grpcListener n
 	})
 
 	grpcServer := grpc.NewServer()
-	envoy_discovery.RegisterAggregatedDiscoveryServiceServer(grpcServer, s.xdsServer)
+	envoy_disco.RegisterAggregatedDiscoveryServiceServer(grpcServer, s.xdsServer)
 
 	go func() {
 		if err := grpcServer.Serve(grpcListener); err != nil {
@@ -125,10 +133,14 @@ func (s *Server) Run(ctx context.Context, looper director.Looper, grpcListener n
 
 // NewServer creates a new Server instance
 func NewServer(ctx context.Context, state *catalog.ServicesState, config config.EnvoyConfig) *Server {
-	// Instruct the snapshot cache to use Aggregated Discovery Service (ADS)
-	// The third parameter can contain a logger instance, but I didn't find
-	// those logs particularly useful.
-	snapshotCache := cache.NewSnapshotCache(true, cache.IDHash{}, nil)
+	logger := log.New()
+	if lvl, err := log.ParseLevel(config.LoggingLevel); err == nil {
+		logger.SetLevel(lvl)
+	} else {
+		log.Warnf("Invalid Envoy logging level (%s): %s", config.LoggingLevel, err)
+	}
+
+	snapshotCache := cache.NewSnapshotCache(true, cache.IDHash{}, logger)
 
 	return &Server{
 		config:        config,

@@ -8,5 +8,6 @@ bower_components
 node_modules
 npm-debug.log
 .idea/
+.vscode/
 .DS_Store
 ui/package-lock.json
