@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -55,11 +56,19 @@ func NewDockerDiscovery(endpoint string, svcNamer ServiceNamer, ip string) *Dock
 }
 
 func checkDockerSocket(endpoint string) {
-	_, err := os.Stat(endpoint)
+	socketPath := strings.TrimPrefix(endpoint, "unix://")
+	info, err := os.Stat(socketPath)
 	if os.IsNotExist(err) {
-		log.Errorf("Warning: %s does not exist.", endpoint)
+		log.Errorf("Docker socket not found at %s", socketPath)
 	} else if err != nil {
-		log.Errorf("Error checking %s: %v", endpoint, err.Error())
+		log.Errorf("Error checking %s: %v", socketPath, err)
+	} else {
+		mode := info.Mode()
+		if mode&os.ModeSocket == 0 {
+			log.Warnf("%s exists but is not a socket", socketPath)
+		} else {
+			log.Debugf("Docker socket exists at %s with permissions %v", socketPath, mode.Perm())
+		}
 	}
 }
 
