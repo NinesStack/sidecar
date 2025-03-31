@@ -192,7 +192,7 @@ type SnapshotCache struct {
 	Waiter chan struct{}
 }
 
-func (c *SnapshotCache) SetSnapshot(ctx context.Context, node string, snapshot cache.Snapshot) error {
+func (c *SnapshotCache) SetSnapshot(ctx context.Context, node string, snapshot cache.ResourceSnapshot) error {
 	err := c.SnapshotCache.SetSnapshot(ctx, node, snapshot)
 
 	c.Waiter <- struct{}{}
