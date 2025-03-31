@@ -2,6 +2,7 @@ package discovery
 
 import (
 	"fmt"
+	"os"
 	"strconv"
 	"sync"
 	"time"
@@ -10,7 +11,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"github.com/NinesStack/sidecar/service"
-	"github.com/fsouza/go-dockerclient"
+	docker "github.com/fsouza/go-dockerclient"
 )
 
 const (
@@ -53,10 +54,21 @@ func NewDockerDiscovery(endpoint string, svcNamer ServiceNamer, ip string) *Dock
 	return &discovery
 }
 
+func checkDockerSocket(endpoint string) {
+	_, err := os.Stat(endpoint)
+	if os.IsNotExist(err) {
+		log.Errorf("Warning: %s does not exist.", endpoint)
+	} else if err != nil {
+		log.Errorf("Error checking %s: %v", endpoint, err.Error())
+	}
+}
+
 func (d *DockerDiscovery) getDockerClient() (DockerClient, error) {
 	if d.endpoint != "" {
+		checkDockerSocket(d.endpoint)
 		client, err := docker.NewClient(d.endpoint)
 		if err != nil {
+			log.Errorf("Error when creating Docker client: %s\n", err.Error())
 			return nil, err
 		}
 
@@ -65,6 +77,7 @@ func (d *DockerDiscovery) getDockerClient() (DockerClient, error) {
 
 	client, err := docker.NewClientFromEnv()
 	if err != nil {
+		log.Errorf("Error when creating Docker client: %s\n", err.Error())
 		return nil, err
 	}
 	return client, nil
