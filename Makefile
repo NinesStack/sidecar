@@ -25,7 +25,7 @@ code-check:
 .PHONY: build
 build: #: Build the app locally
 build: clean 
-	GOOS=linux $(GO) build $(GO_BUILD_FLAGS) -o $(APP_NAME)
+	GOOS=linux GOARCH=amd64 $(GO) build $(GO_BUILD_FLAGS) -o $(APP_NAME)
 	./docker/build.sh
 
 .PHONY: release
