@@ -316,7 +316,8 @@ func (d *DockerDiscovery) manageConnection(quit chan bool) {
 	for {
 		// Is the client connected?
 		if client == nil || client.Ping() != nil {
-			log.Warn("Lost connection to Docker, re-connecting")
+			err := client.Ping()
+			log.Errorf("Lost connection to Docker: '%v'. re-connecting", err)
 			if client != nil {
 				// Swallow errors since we're overwriting the client anyway
 				_ = client.RemoveEventListener(d.events)
