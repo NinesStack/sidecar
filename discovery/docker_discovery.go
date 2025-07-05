@@ -63,14 +63,15 @@ func checkDockerSocket(endpoint string) {
 		return
 	} else if err != nil {
 		log.Errorf("Error checking %s: %v", socketPath, err)
-	} else {
-		mode := info.Mode()
-		if mode&os.ModeSocket == 0 {
-			log.Warnf("%s exists but is not a socket", socketPath)
-		} else {
-			log.Debugf("Docker socket exists at %s with permissions %v", socketPath, mode.Perm())
-		}
+		return
 	}
+	mode := info.Mode()
+	if mode&os.ModeSocket == 0 {
+		log.Warnf("%s exists but is not a socket", socketPath)
+		return
+	}
+	
+	log.Debugf("Docker socket exists at %s with permissions %v", socketPath, mode.Perm())
 }
 
 func (d *DockerDiscovery) getDockerClient() (DockerClient, error) {
