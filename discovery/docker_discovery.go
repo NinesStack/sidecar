@@ -60,6 +60,7 @@ func checkDockerSocket(endpoint string) {
 	info, err := os.Stat(socketPath)
 	if os.IsNotExist(err) {
 		log.Errorf("Docker socket not found at %s", socketPath)
+		return
 	} else if err != nil {
 		log.Errorf("Error checking %s: %v", socketPath, err)
 	} else {
