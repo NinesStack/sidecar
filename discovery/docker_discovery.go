@@ -70,7 +70,7 @@ func checkDockerSocket(endpoint string) {
 		log.Warnf("%s exists but is not a socket", socketPath)
 		return
 	}
-	
+
 	log.Debugf("Docker socket exists at %s with permissions %v", socketPath, mode.Perm())
 }
 
@@ -326,15 +326,20 @@ func (d *DockerDiscovery) manageConnection(quit chan bool) {
 	// Health check the connection and set it back up when it goes away.
 	for {
 		// Is the client connected?
-		if client == nil || client.Ping() != nil {
-			err := client.Ping()
+		var needsReconnect bool
+		if client == nil {
+			needsReconnect = true
+		} else if err := client.Ping(); err != nil {
 			log.Errorf("Lost connection to Docker: '%v'. re-connecting", err)
+			needsReconnect = true
+		}
+
+		if needsReconnect {
 			if client != nil {
 				// Swallow errors since we're overwriting the client anyway
 				_ = client.RemoveEventListener(d.events)
 			}
 			d.events = make(chan *docker.APIEvents) // RemoveEventListener closes it
-
 			client = d.configureDockerConnection()
 		}
 

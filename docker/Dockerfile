@@ -1,4 +1,4 @@
-FROM library/alpine:3.21
+FROM library/alpine:3.22
 
 # Necessary depedencies
 RUN apk --update add haproxy bash curl tar s6

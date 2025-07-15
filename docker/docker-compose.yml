@@ -1,5 +1,3 @@
-version: "2"
-
 # Docker for Mac dev support for Sidecar containers
 
 # This compose file is intended for use on Docker for Mac
