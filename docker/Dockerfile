@@ -1,4 +1,4 @@
-FROM library/alpine:3.20
+FROM library/alpine:3.23
 
 # Necessary depedencies
 RUN apk --update add haproxy bash curl tar s6
@@ -11,4 +11,4 @@ ADD ui /sidecar/ui
 
 EXPOSE 7777
 
-CMD ["/bin/s6-svscan", "/etc/s6"]
+CMD ["/usr/bin/s6-svscan", "/etc/s6"]

@@ -235,7 +235,7 @@ func connectionManagerForService(svc *service.Service, envoyServiceName string) 
 		manager = &hcm.HttpConnectionManager{
 			StatPrefix: "ingress_http",
 			HttpFilters: []*hcm.HttpFilter{{
-				Name: wellknown.Router,
+				Name:       wellknown.Router,
 				ConfigType: &hcm.HttpFilter_TypedConfig{TypedConfig: routerConfig},
 			}},
 			RouteSpecifier: &hcm.HttpConnectionManager_RouteConfig{
