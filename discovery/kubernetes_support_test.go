@@ -101,6 +101,43 @@ func Test_makeRequest(t *testing.T) {
 			So(body, ShouldBeEmpty)
 		})
 
+		Convey("refreshes token and retries on 401", func() {
+			callCount := 0
+			httpmock.RegisterResponder("GET", "http://beowulf.example.com:80/nowhere",
+				func(req *http.Request) (*http.Response, error) {
+					callCount++
+					if callCount == 1 {
+						return httpmock.NewJsonResponse(401, map[string]interface{}{"error": "unauthorized"})
+					}
+					return httpmock.NewJsonResponse(200, map[string]interface{}{"success": "yeah"})
+				},
+			)
+
+			capture := LogCapture(func() {
+				body, err := cmd.makeRequest("/nowhere", "")
+				So(err, ShouldBeNil)
+				So(body, ShouldNotBeEmpty)
+			})
+
+			So(callCount, ShouldEqual, 2)
+			So(capture, ShouldContainSubstring, "Got 401 from K8s API")
+		})
+
+		Convey("returns error when retry after 401 also fails", func() {
+			httpmock.RegisterResponder("GET", "http://beowulf.example.com:80/nowhere",
+				httpmock.NewJsonResponderOrPanic(401, map[string]interface{}{"error": "unauthorized"}),
+			)
+
+			capture := LogCapture(func() {
+				body, err := cmd.makeRequest("/nowhere", "")
+				So(err, ShouldNotBeNil)
+				So(err.Error(), ShouldContainSubstring, "got unexpected response code from /nowhere: 401")
+				So(body, ShouldBeEmpty)
+			})
+
+			So(capture, ShouldContainSubstring, "Got 401 from K8s API")
+		})
+
 		Convey("handles error back from http call", func() {
 			httpmock.RegisterResponder("GET", "http://beowulf.example.com:80/nowhere",
 				httpmock.NewErrorResponder(errors.New("intentional test error")),

@@ -1,6 +1,6 @@
 module github.com/NinesStack/sidecar
 
-go 1.21
+go 1.26
 
 require (
 	github.com/NinesStack/memberlist v0.0.0-20170522194404-cfac2b5cf519

@@ -209,8 +209,9 @@ type KubeAPIDiscoveryCommand struct {
 	Namespace string
 	Timeout   time.Duration
 
-	KubeHost string
-	KubePort int
+	KubeHost  string
+	KubePort  int
+	credsPath string
 
 	token  string
 	client *http.Client
@@ -223,6 +224,7 @@ func NewKubeAPIDiscoveryCommand(kubeHost string, kubePort int, namespace string,
 		Timeout:   timeout,
 		KubeHost:  kubeHost,
 		KubePort:  kubePort,
+		credsPath: credsPath,
 	}
 	// Cache the secret from the file
 	data, err := ioutil.ReadFile(credsPath + "/token")
@@ -263,6 +265,26 @@ func NewKubeAPIDiscoveryCommand(kubeHost string, kubePort int, namespace string,
 	return d
 }
 
+// refreshToken re-reads the service account token from disk. The kubelet
+// rotates this file before the token expires.
+func (d *KubeAPIDiscoveryCommand) refreshToken() error {
+	data, err := ioutil.ReadFile(d.credsPath + "/token")
+	if err != nil {
+		return fmt.Errorf("failed to read serviceaccount token: %w", err)
+	}
+	d.token = strings.Replace(string(data), "\n", "", -1)
+	return nil
+}
+
+func (d *KubeAPIDiscoveryCommand) newRequest(urlStr string) (*http.Request, error) {
+	req, err := http.NewRequest("GET", urlStr, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+d.token)
+	return req, nil
+}
+
 func (d *KubeAPIDiscoveryCommand) makeRequest(path string, params string) ([]byte, error) {
 	var scheme = "http"
 	if d.KubePort == 443 {
@@ -275,16 +297,36 @@ func (d *KubeAPIDiscoveryCommand) makeRequest(path string, params string) ([]byt
 		Path:   path,
 	}
 
-	req, err := http.NewRequest("GET", fmt.Sprintf("%s?%s", apiURL.String(), params), nil)
+	fullURL := fmt.Sprintf("%s?%s", apiURL.String(), params)
+
+	req, err := d.newRequest(fullURL)
 	if err != nil {
 		return []byte{}, err
 	}
 
-	req.Header.Set("Authorization", "Bearer "+d.token)
-
 	resp, err := d.client.Do(req)
 	if err != nil {
 		return []byte{}, fmt.Errorf("failed to fetch from K8s API '%s': %w", path, err)
+	}
+
+	// On 401, refresh the token from disk and retry once
+	if resp.StatusCode == http.StatusUnauthorized {
+		resp.Body.Close()
+
+		log.Warnf("Got 401 from K8s API for '%s', refreshing service account token", path)
+		if err := d.refreshToken(); err != nil {
+			return []byte{}, fmt.Errorf("failed to refresh token after 401: %w", err)
+		}
+
+		req, err = d.newRequest(fullURL)
+		if err != nil {
+			return []byte{}, err
+		}
+
+		resp, err = d.client.Do(req)
+		if err != nil {
+			return []byte{}, fmt.Errorf("failed to fetch from K8s API '%s' after token refresh: %w", path, err)
+		}
 	}
 	defer resp.Body.Close()
 

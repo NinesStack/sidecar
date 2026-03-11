@@ -81,13 +81,13 @@ func (k *K8sAPIDiscoverer) servicesForNode(hostname, ip string) []service.Servic
 // serviceFromPod returns a Sidecar service for a K8sPod
 func (k *K8sAPIDiscoverer) serviceFromPod(svcName, ip string, pod K8sPod) service.Service {
 	svc := service.Service{
-		ID:        pod.Metadata.UID,
-		Name:      svcName,
-		Image:     pod.Image(),
-		Created:   pod.Metadata.CreationTimestamp,
-		Hostname:  pod.Spec.NodeName,
-		Status:    service.ALIVE,
-		Updated:   time.Now().UTC(),
+		ID:       pod.Metadata.UID,
+		Name:     svcName,
+		Image:    pod.Image(),
+		Created:  pod.Metadata.CreationTimestamp,
+		Hostname: pod.Spec.NodeName,
+		Status:   service.ALIVE,
+		Updated:  time.Now().UTC(),
 	}
 
 	// It's possible to override the default with a ProxyMode label
